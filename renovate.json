@@ -1,0 +1,59 @@
+{
+  "extends": [
+    "config:base",
+    ":semanticCommits",
+    ":dependencyDashboard",
+    ":maintainLockFilesMonthly",
+    ":groupAllNonMajor",
+    ":prHourlyLimit10",
+    ":prConcurrentLimit5"
+  ],
+
+  "packageRules": [
+    {
+      "matchManagers": ["npm"],
+      "matchPackagePatterns": ["*"],
+      "matchPaths": ["apps/**", "packages/**"],
+      "rangeStrategy": "bump",
+      "groupName": "js-deps (apps & packages)"
+    },
+
+    {
+      "matchManagers": ["terraform"],
+      "groupName": "Terraform modules",
+      "schedule": ["at any time"]
+    },
+    {
+      "matchManagers": ["helm-values", "helmfile"],
+      "groupName": "Helm charts",
+      "schedule": ["at any time"]
+    },
+
+    {
+      "matchPackageNames": ["strapi", "@strapi/*"],
+      "groupName": "Strapi core",
+      "rangeStrategy": "bump"
+    },
+
+    {
+      "matchPackageNames": ["eslint", "prettier", "@commitlint/*"],
+      "groupName": "Dev-tooling (lint/format)",
+      "automerge": true,
+      "automergeType": "pr"
+    }
+  ],
+
+  "lockFileMaintenance": {
+    "enabled": true,
+    "fileMatch": ["(^|/)(package-lock\\.json|yarn\\.lock)$"],
+    "schedule": ["monthly"]
+  },
+
+  "timezone": "Europe/Brussels",
+  "schedule": [
+    "before 05:00",
+    "after 22:00"
+  ],
+
+  "gitAuthor": "Renovate Bot <renovate[bot]@users.noreply.github.com>"
+}
