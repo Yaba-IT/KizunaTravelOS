@@ -1,0 +1,57 @@
+# EditorConfig helps maintain consistent coding styles.
+# Docs: https://editorconfig.org
+
+root = true
+
+############################
+#  Core settings (all files)
+############################
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+############################
+#  Markdown & docs
+############################
+[*.md]
+trim_trailing_whitespace = false  # keep spaces for markdown line breaks
+
+############################
+#  YAML / YML
+############################
+[*.{yml,yaml}]
+indent_size = 2
+
+############################
+#  JSON / JSONC
+############################
+[*.{json,jsonc}]
+indent_style = space
+indent_size = 2
+quote_type = double
+
+############################
+#  Shell scripts
+############################
+[*.{sh,bash,zsh}]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
+############################
+#  Terraform
+############################
+[*.tf]
+indent_style = space
+indent_size = 2
+
+############################
+#  Ignore compiled/minified files
+############################
+[*.min.js]
+insert_final_newline = false
+trim_trailing_whitespace = false
