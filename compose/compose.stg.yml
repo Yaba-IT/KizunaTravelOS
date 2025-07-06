@@ -1,0 +1,5 @@
+services:
+  erp-api:
+    environment:
+      - NODE_ENV=staging
+      - LOG_LEVEL=debug
