@@ -8,4 +8,7 @@
 
 ## 🚀 Lancer en 30 s
 
-
+## ⚠️ Disclaimer
+KizunaTravelOS est fourni **tel quel, sans garantie d'aucune sorte**.  
+Chaque utilisateur reste responsable de sa mise en conformité légale (RGPD,
+obligations comptables, etc.) et de la sécurité de son déploiement.
