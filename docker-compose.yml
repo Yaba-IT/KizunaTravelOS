@@ -1,0 +1,50 @@
+volumes:
+  mongo-data:
+  pg-data:
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports: ["27017:27017"]
+    volumes: ["mongo-data:/data/db"]
+
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: accounting_dev
+    ports: ["5432:5432"]
+    volumes: ["pg-data:/var/lib/postgresql/data"]
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports: ["5672:5672", "15672:15672"]
+    restart: unless-stopped
+
+  erp-api:
+    build: ./apps/erp-api
+    env_file: ./apps/erp-api/.env
+    depends_on: [mongo]
+    ports: ["4000:4000"]
+
+  accounting-svc:
+    build: ./apps/accounting-svc
+    env_file: ./apps/accounting-svc/.env
+    depends_on: [postgres]
+    ports: ["4100:4100"]
+
+  cms:
+    build: ./apps/cms
+    env_file: ./apps/cms/.env
+    ports: ["4200:4200"]
+    depends_on: [postgres]
+
+  web:
+    build: ./apps/web
+    depends_on: [erp-api]
+    ports: ["5173:80"]
+
+
