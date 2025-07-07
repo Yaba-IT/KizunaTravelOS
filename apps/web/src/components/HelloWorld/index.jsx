@@ -1,15 +1,7 @@
-import React from "react"
-import PropTypes from "prop-types"
+import React from 'react';
 
-function HelloWorld (props) {
-
-  return (
-    <div>Hello World</div>
-  )
+function HelloWorld() {
+  return <h2>Hello World!</h2>;
 }
 
-HelloWorld.propTypes = {
-  props: PropTypes.any
-}
-
-export default HelloWorld
+export default HelloWorld;
