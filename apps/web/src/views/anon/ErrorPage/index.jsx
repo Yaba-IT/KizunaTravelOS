@@ -4,8 +4,8 @@ import ErrorMessage from '../../../components/ErrorMessage';
 function ErrorPage() {
   return (
     <>
+      <h1>Error Page...</h1>
       <ErrorMessage />
-      <h1>Error loading...</h1>;
     </>
   );
 }
