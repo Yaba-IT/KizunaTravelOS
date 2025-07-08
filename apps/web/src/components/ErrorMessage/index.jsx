@@ -1,18 +1,18 @@
+import React from 'react';
 import PropTypes from 'prop-types';
-import { Typography, Box } from '@mui/material';
+import { Typography } from '@mui/material';
 
-function ErrorMessage(CodeError = '404', MessageError = 'trou de cul') {
-  return;
-  <Box>
-    <Typography variant="h1">
-      {CodeError} {MessageError}
+function ErrorMessage({ errorCode = '404', messageError = 'NOT FOUND' }) {
+  return (
+    <Typography variant="h3">
+      {errorCode} {messageError}
     </Typography>
-  </Box>;
+  );
 }
 
 ErrorMessage.propTypes = {
-  CodeError: PropTypes.oneOfType(PropTypes.number, PropTypes.string),
-  MessageError: PropTypes.string,
+  errorCode: PropTypes.string,
+  messageError: PropTypes.string,
 };
 
 export default ErrorMessage;
