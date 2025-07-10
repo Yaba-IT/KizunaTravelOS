@@ -1,44 +1,14 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
-  AppBar,
   Box,
-  Toolbar,
   IconButton,
-  Typography,
   Menu,
-  Container,
-  Avatar,
-  Button,
-  Tooltip,
-  MenuItem,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import { ExpandLess, ExpandMore } from '@mui/icons-material';
-import Shevron from '../Shevron';
-import NavBtnV2 from '../NavBtnV2';
+import NavBtnItem from '../NavBtnItem';
+import NavBtnList from '../NavBtnList';
+import { NavBarListItems as Links } from '../../constants/NavBarListItems';
 
-const Links = [
-  {
-    name: "Home",
-    target: "/",
-    sub: null
-  },
-  {
-    name: "Service",
-    target: "product",
-    sub: [
-      {
-        name: "cloud",
-        target: "/product/cloud"
-      }
-    ]
-  },
-  {
-    name: "Contact us",
-    target: "contactUs",
-    sub: null
-  },
-]
 
 function NavBtn() {
   const [anchorElNav, setAnchorElNav] = useState(null);
@@ -51,12 +21,6 @@ function NavBtn() {
     setAnchorElNav(null);
   };
 
-  const handleClick = (event) => {
-    handleCloseNavMenu(event)
-
-  };
-
-  const [openDetail, setOpenDetail] = useState(false)
 
   return (
     <>
@@ -87,14 +51,12 @@ function NavBtn() {
           onClose={handleCloseNavMenu}
           sx={{ display: { xs: 'block', md: 'none' } }}
         >
-          {Links.map((linkItem, key) => (
-          <NavBtnV2 key={key} elements={linkItem} />
-        ))}
+          <NavBtnList lists={Links} handleCloseNavMenu={handleCloseNavMenu}/>
         </Menu>
       </Box>
       <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
-        {Links.map((linkItem, key) => (
-          <NavBtnV2 key={key} elements={linkItem} />
+        {Links.map(({name, target, sub}, key) => (
+          <NavBtnItem key={key} name={name} target={target} sub={sub} />
         ))}
       </Box>
     </>);
