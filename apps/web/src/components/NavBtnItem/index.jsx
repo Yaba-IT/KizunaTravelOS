@@ -67,7 +67,7 @@ function NavBtnItem({ name, target, sub }, ...props) {
       <Button
         variant="contained"
         disableElevation
-        sx={{ my: 2 }}
+        sx={{ my: 2, backgroundColor: "#152e44" }}
         onClick={()=>console.log(`Navigating to ${target}`)}
         {...props}
         endIcon={ sub &&
@@ -76,9 +76,9 @@ function NavBtnItem({ name, target, sub }, ...props) {
           </Box>
         }
       >
-        <Typography variant='body1'>
-          {name}
-        </Typography>
+          <Typography variant='body1' sx={{textTransform: "capitalize"}} color='inherit'>
+            {name}
+          </Typography>
         
       </Button>
       {sub && (
