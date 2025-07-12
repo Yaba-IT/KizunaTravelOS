@@ -7,6 +7,11 @@ on:
       - '.github/workflows/test-erp-api.yml'
       - 'package.json'
 
+permissions:
+  contents: read
+  issues: write
+  metadata: read
+
 jobs:
   erp-api:
     name: ERP‑API Tests & Build
