@@ -7,6 +7,11 @@ on:
       - '.github/workflows/test-web.yml'
       - 'package.json'
 
+permissions:
+  contents: read
+  issues: write
+  metadata: read
+
 jobs:
   web:
     name: WEB Tests & Build
