@@ -4,4 +4,5 @@ module.exports = {
   collectCoverage: true,
   coverageDirectory: 'coverage',
   testPathIgnorePatterns: ['/node_modules/', '/dist/', '/build/'],
+  reporters: ['default', ['jest-junit', { outputDirectory: './', outputName: 'junit.xml' }]],
 };
