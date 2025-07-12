@@ -1,0 +1,36 @@
+name: ERP‑API CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/erp-api/**'
+      - '.github/workflows/test-erp-api.yml'
+      - 'package.json'
+
+jobs:
+  erp-api:
+    name: ERP‑API Tests & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'yarn'
+      - name: Install dependencies
+        run: yarn workspace erp-api install --frozen-lockfile
+      - name: Run ESLint
+        run: yarn workspace erp-api lint
+      - name: Run Jest tests
+        run: yarn workspace erp-api test --ci
+      - name: Build Docker image
+        run: docker build -t erp-api:ci apps/erp-api
+      - name: Validate service with Docker Compose
+        run: |
+          docker-compose -f compose/compose.base.yml -f compose/compose.dev.yml run --rm erp-api echo OK
+      - name: Report failure via Issue
+        if: failure()
+        uses: jayqi/failed-build-issue-action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,60 @@
+name: CI – erp-api
+
+on:
+  pull_request:
+    paths:
+      - 'apps/erp-api/**'
+      - '.github/workflows/test-erp-api.yml'
+
+jobs:
+  detect_changes:
+    runs-on: ubuntu-latest
+    name: 🔍 Detect erp‑api changes
+    outputs:
+      erp: ${{ steps.filter.outputs.erp }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            erp:
+              - 'apps/erp-api/**'
+  test_changed:
+    runs-on: ubuntu-latest
+    name: ⚡ Run targeted unit tests
+    needs: detect_changes
+    if: needs.detect_changes.outputs.erp == 'true'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.19.3'
+      - run: cd apps/erp-api && yarn install
+      - name: Run only changed tests
+        run: yarn jest --findRelatedTests $(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '^apps/erp-api/' | sed 's|apps/erp-api/||')
+  test_full:
+    runs-on: ubuntu-latest
+    name: 🧪 Run full test suite + coverage
+    needs: detect_changes
+    if: needs.detect_changes.outputs.erp == 'true'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.19.3'
+      - run: cd apps/erp-api && yarn install
+      - run: cd apps/erp-api && yarn lint
+      - run: cd apps/erp-api && yarn test --coverage
+  build:
+    runs-on: ubuntu-latest
+    name: 🐳 Build Docker image
+    needs: test_full
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build erp-api Docker image
+        run: |
+          cd apps/erp-api
+          docker build -t my-org/erp-api:${{ github.sha }} .

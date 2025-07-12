@@ -1,0 +1,49 @@
+name: WEB CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/test-web.yml'
+      - 'package.json'
+
+jobs:
+  web:
+    name: WEB Tests & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'yarn'
+      - name: Install dependencies
+        run: yarn workspace web install --frozen-lockfile
+      - name: Run ESLint
+        run: yarn workspace web lint
+      - name: Filter paths
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            components:
+              - 'apps/web/src/components/**'
+            full:
+              - 'apps/web/src/**/*'
+      - name: Run component-scope tests
+        if: steps.changes.outputs.components == 'true'
+        run: yarn workspace web test src/components --ci
+      - name: Run full suite
+        if: steps.changes.outputs.full == 'true'
+        run: yarn workspace web test --ci
+      - name: Build Docker image
+        run: docker build -t web:ci apps/web
+      - name: Docker Compose validation
+        run: |
+          docker-compose -f compose/compose.base.yml -f compose/compose.dev.yml run --rm web echo OK
+      - name: Report failure via Issue
+        if: failure()
+        uses: jayqi/failed-build-issue-action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
