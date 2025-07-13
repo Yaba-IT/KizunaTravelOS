@@ -14,13 +14,14 @@ module.exports = {
     'airbnb-base',
     'plugin:import/errors',
     'plugin:import/warnings',
-    'plugin:prettier/recommended', 
+    'plugin:prettier/recommended',
   ],
   plugins: ['import', 'jest', 'prettier'],
   rules: {
     'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
     'prettier/prettier': 'error',
-  },  
+    'max-len': ['error', { 'code': 100}],
+  },
   overrides: [
     {
       files: ['apps/web/**/*.{js,jsx}'],
@@ -35,7 +36,7 @@ module.exports = {
         react: { version: 'detect' },
       },
       rules: {
-        'react/react-in-jsx-scope': 'off', 
+        'react/react-in-jsx-scope': 'off',
       },
     },
   ],
