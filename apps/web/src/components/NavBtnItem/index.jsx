@@ -1,12 +1,7 @@
 import * as React from 'react';
 import { styled, alpha } from '@mui/material/styles';
-import {Button, Box} from '@mui/material';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import { IconButton, Typography } from '@mui/material';
-import ExpandLess from '@mui/icons-material/ExpandLess';
-import ExpandMore from '@mui/icons-material/ExpandMore';
+import { Typography, MenuItem, Menu, Button, Box } from '@mui/material';
+import {ExpandLess, ExpandMore} from '@mui/icons-material';
 import PropTypes from 'prop-types';
 
 const StyledMenu = styled((props) => (

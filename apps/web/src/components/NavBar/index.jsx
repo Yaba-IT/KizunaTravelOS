@@ -6,18 +6,15 @@ import {
   Container,
   Typography,
 } from '@mui/material';
-import AdbIcon from '@mui/icons-material/Adb';
 import NavBtn from '../NavBtn';
-import logo from '../../assets/logo.png'; // Adjust the path as necessary
+import logo from '../../assets/logo.png'
 
 function NavBar() {
   return (
     <AppBar data-testid="app-bar" position="static" sx={{ backgroundColor: "#152e44"}}>
       <Container maxWidth="xl">
-        <Box disableGutters sx={{ display: "flex", w: 100, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <Box>
-            <img src={logo} height={65} alt={`${logo}-image`} />
-          </Box>
+        <Box sx={{ display: "flex", w: 100, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Box component={"img"} src={logo} height={65} alt={`${logo}-image`} />
           <NavBtn />
           <Button
             variant="contained"
