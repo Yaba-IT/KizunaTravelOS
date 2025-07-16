@@ -1,15 +1,30 @@
 import * as React from 'react';
 import { List, ListItemButton, ListItemText, Collapse, Box, IconButton } from '@mui/material';
-import { ExpandLess, ExpandMore} from '@mui/icons-material';
+import { ExpandLess, ExpandMore } from '@mui/icons-material';
+import { IsExternalLink } from '../../utils/IsExternalLink';
+import { useNavigate } from 'react-router-dom';
 
-function NavBtnList({ lists }) {
+function NavBtnList({ lists, handleCloseNavMenu }) {
+  let navigate = useNavigate();
+
   const [openList, setOpenList] = React.useState({});
 
-  const handleClick = (name) => {
+  const handleClick = (e, name) => {
+    e.stopPropagation();
+    e.preventDefault();
     setOpenList((prev) => ({
       ...prev,
       [name]: !prev[name]
     }));
+  };
+
+  const NavigateToLink = (target) => {
+    handleCloseNavMenu();
+    if (IsExternalLink(target)) {
+      window.open(target)
+    } else {
+      navigate(target);
+    }
   };
 
   return (
@@ -21,10 +36,10 @@ function NavBtnList({ lists }) {
       {lists.map((list) => (
         <Box data-testid="list-item" key={list.name}>
           <ListItemButton>
-            <ListItemText primary={list.name} onClick={() => { handleCloseNavMenu() }} />
+            <ListItemText primary={list.name} onClick={() => NavigateToLink(list.target)} />
 
             {list.sub &&
-              <IconButton onClick={() => handleClick(list.name)}>
+              <IconButton onClick={(e) => handleClick(e, list.name)}>
                 {openList[list.name] ? <ExpandLess /> : <ExpandMore />}
               </IconButton>
             }
@@ -34,7 +49,7 @@ function NavBtnList({ lists }) {
             <Collapse in={openList[list.name]} timeout="auto" unmountOnExit>
               <List component="div" disablePadding>
                 {list.sub.map((subItem, subIndex) => (
-                  <ListItemButton key={subIndex} sx={{ pl: 4 }} onClick={() => { handleCloseNavMenu() }}>
+                  <ListItemButton key={subIndex} sx={{ pl: 4 }} onClick={() => NavigateToLink(subItem.target)}>
                     <ListItemText primary={subItem.name} />
                   </ListItemButton>
                 ))}
