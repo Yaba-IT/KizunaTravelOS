@@ -4,5 +4,7 @@ module.exports = {
   transform: {
     '\\.[jt]sx?$': 'babel-jest',
   },
-  reporters: ['default', ['jest-junit', { outputDirectory: './', outputName: 'junit.xml' }]],
+  moduleNameMapper: {
+    '\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/src/__mocks__/fileMock.js',
+  }
 };
