@@ -6,27 +6,27 @@ export const NavBarListItems = [
   },
   {
     name: "Product",
-    target: "product",
+    target: "/products",
     sub: [
       {
         name: "blog",
-        target: "/product/blog"
+        target: "/products/blog"
       }
     ]
   },
   {
     name: "Service",
-    target: "service",
+    target: "http://service.com",
     sub: [
       {
         name: "cloud",
-        target: "/product/cloud"
+        target: "/service/cloud"
       }
     ]
   },
   {
     name: "Contact us",
-    target: "contactUs",
+    target: "/contact",
     sub: null
   },
 ]
