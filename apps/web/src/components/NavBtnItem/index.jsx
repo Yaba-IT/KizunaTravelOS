@@ -1,8 +1,10 @@
 import * as React from 'react';
 import { styled, alpha } from '@mui/material/styles';
 import { Typography, MenuItem, Menu, Button, Box } from '@mui/material';
-import {ExpandLess, ExpandMore} from '@mui/icons-material';
+import { ExpandLess, ExpandMore } from '@mui/icons-material';
 import PropTypes from 'prop-types';
+import { useNavigate } from 'react-router-dom';
+import { IsExternalLink } from '../../utils/IsExternalLink';
 
 const StyledMenu = styled((props) => (
   <Menu
@@ -48,13 +50,27 @@ const StyledMenu = styled((props) => (
 }));
 
 function NavBtnItem({ name, target, sub }, ...props) {
+  const navigate = useNavigate();
+
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
-  const handleClick = (event) => {
+  const handleClickExpend = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     setAnchorEl(event.currentTarget);
   };
-  const handleClose = () => {
+  const handleCloseExpend = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     setAnchorEl(null);
+  };
+
+  const NavigateToLink = () => {
+    if (IsExternalLink(target)) {
+      window.open(target)
+    } else {
+      navigate(target);
+    }
   };
 
   return (
@@ -63,46 +79,46 @@ function NavBtnItem({ name, target, sub }, ...props) {
         variant="contained"
         disableElevation
         sx={{ my: 2, backgroundColor: "#152e44" }}
-        onClick={()=>console.log(`Navigating to ${target}`)}
+        onClick={NavigateToLink}
         {...props}
-        endIcon={ sub &&
-          <Box data-testid="btn-menu" onClick={handleClick} color='inherit' display={'flex'} alignItems={'center' }>
+        endIcon={sub &&
+          <Box data-testid="btn-menu" onClick={handleClickExpend} color='inherit' display={'flex'} alignItems={'center'}>
             {open ? <ExpandLess /> : <ExpandMore />}
           </Box>
         }
       >
-          <Typography variant='body1' sx={{textTransform: "capitalize"}} color='inherit'>
-            {name}
-          </Typography>
-        
+        <Typography variant='body1' sx={{ textTransform: "capitalize" }}>
+          {name}
+        </Typography>
+
       </Button>
       {sub && (
-          <StyledMenu
-            slotProps={{
-              list: {
-                'aria-labelledby': 'scrollBtn',
-              },
-            }}
-            anchorEl={anchorEl}
-            open={open}
-            onClose={handleClose}
-          >
-            {
-              sub?.map((item) => (
-                <MenuItem onClick={handleClose} disableRipple>
-                  {item?.name ?? "na"}
-                </MenuItem>
-              ))
-            }
-          </StyledMenu>
-        )}
+        <StyledMenu
+          slotProps={{
+            list: {
+              'aria-labelledby': 'scrollBtn',
+            },
+          }}
+          anchorEl={anchorEl}
+          open={open}
+          onClose={handleCloseExpend}
+        >
+          {
+            sub?.map((item) => (
+              <MenuItem onClick={handleCloseExpend} disableRipple>
+                {item?.name ?? "na"}
+              </MenuItem>
+            ))
+          }
+        </StyledMenu>
+      )}
     </>
   );
 }
 
 NavBtnItem.propTypes = {
   name: PropTypes.string.isRequired,
-  target: PropTypes.string, 
+  target: PropTypes.string,
   sub: PropTypes.arr
 }
 
