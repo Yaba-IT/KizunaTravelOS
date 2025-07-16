@@ -1,14 +1,12 @@
 import React from 'react';
 import HelloWorld from '../../../components/HelloWorld';
-import MenuComponent from '../../../components/NavBar';
-import { AppBar, Box, Container, Toolbar } from '@mui/material';
-import AdbIcon from '@mui/icons-material/Adb';
 import NavBar from '../../../components/NavBar';
+import { NavBarListItems as links } from '../../../constants/NavBarListItems';
 
 function HomePage() {
   return (
     <>
-      <NavBar />
+      <NavBar links={links} />
       <h1>Home Page</h1>
       <HelloWorld />
 
