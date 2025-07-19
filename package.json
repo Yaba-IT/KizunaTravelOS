@@ -6,5 +6,6 @@
   "scripts": {
     "build": "babel src -d lib",
     "test": "jest"
-  }
+  },
+  "workspaces": ["web", "erp-api", "accounting-svc"]
 }
