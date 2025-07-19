@@ -3,5 +3,9 @@
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1"
   },
+  "scripts": {
+    "build": "babel src -d lib",
+    "test": "jest"
+  },
   "workspaces": ["web", "erp-api", "accounting-svc"]
 }
