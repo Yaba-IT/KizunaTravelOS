@@ -20,6 +20,11 @@ const routesDefinitions = [
     element: ProductsPage,
   },
   {
+    path: '/products/blog',
+    isProtected: false,
+    element: ContactPage,
+  },
+  {
     path: '/contact',
     isProtected: false,
     element: ContactPage,
