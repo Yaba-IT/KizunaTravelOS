@@ -3,8 +3,7 @@ import { styled, alpha } from '@mui/material/styles';
 import { Typography, MenuItem, Menu, Button, Box } from '@mui/material';
 import { ExpandLess, ExpandMore } from '@mui/icons-material';
 import PropTypes from 'prop-types';
-import { useNavigate } from 'react-router-dom';
-import { IsExternalLink } from '../../utils/IsExternalLink';
+import { useHandleNavigate } from '../../hooks/useHandleNavigate';
 
 const StyledMenu = styled((props) => (
   <Menu
@@ -50,7 +49,8 @@ const StyledMenu = styled((props) => (
 }));
 
 function NavBtnItem({ name, target, sub }, ...props) {
-  const navigate = useNavigate();
+
+  const handleNavigate = useHandleNavigate();
 
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
@@ -65,21 +65,13 @@ function NavBtnItem({ name, target, sub }, ...props) {
     setAnchorEl(null);
   };
 
-  const NavigateToLink = () => {
-    if (IsExternalLink(target)) {
-      window.open(target)
-    } else {
-      navigate(target);
-    }
-  };
-
   return (
     <>
       <Button
         variant="contained"
         disableElevation
         sx={{ my: 2, backgroundColor: "#152e44" }}
-        onClick={NavigateToLink}
+        onClick={ () => handleNavigate(target)}
         {...props}
         endIcon={sub &&
           <Box data-testid="btn-menu" onClick={handleClickExpend} color='inherit' display={'flex'} alignItems={'center'}>
@@ -104,8 +96,8 @@ function NavBtnItem({ name, target, sub }, ...props) {
           onClose={handleCloseExpend}
         >
           {
-            sub?.map((item) => (
-              <MenuItem onClick={handleCloseExpend} disableRipple>
+            sub?.map((item, e) => (
+              <MenuItem key={item?.name ?? e} onClick={ () => { handleNavigate(item.target)}} disableRipple>
                 {item?.name ?? "na"}
               </MenuItem>
             ))
