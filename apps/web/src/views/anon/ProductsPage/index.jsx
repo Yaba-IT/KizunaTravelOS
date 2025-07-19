@@ -1,14 +1,12 @@
-import { Box } from '@mui/material'
 import React from 'react'
-import { NavBarListItems as links } from '../../../constants/NavBarListItems';
-import NavBar from '../../../components/NavBar';
+import { Box } from '@mui/material'
+import { PublicLayout } from '../../../utils/layouts.jsx';
 
 function ProductsPage() {
   return (
-    <>
-      <NavBar links={links} />
+    <PublicLayout>
       <Box>Products page</Box>
-    </>
+    </PublicLayout>
   )
 }
 

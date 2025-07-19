@@ -1,16 +1,13 @@
 import React from 'react';
 import HelloWorld from '../../../components/HelloWorld';
-import NavBar from '../../../components/NavBar';
-import { NavBarListItems as links } from '../../../constants/NavBarListItems';
+import { PublicLayout } from '../../../utils/layouts.jsx';
 
 function HomePage() {
   return (
-    <>
-      <NavBar links={links} />
+    <PublicLayout>
       <h1>Home Page</h1>
       <HelloWorld />
-
-    </>
+    </PublicLayout>
   );
 }
 

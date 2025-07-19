@@ -1,14 +1,11 @@
 import { Box } from '@mui/material'
-import React from 'react'
-import { NavBarListItems as links } from '../../../constants/NavBarListItems';
-import NavBar from '../../../components/NavBar';
+import { PublicLayout } from '../../../utils/layouts.jsx';
 
 function ContactPage() {
   return (
-    <>
-        <NavBar links={links} />
-        <Box>Contact page</Box>
-    </>
+    <PublicLayout>
+      <Box>Contact page</Box>
+    </PublicLayout>
   )
 }
 
