@@ -1,11 +1,9 @@
 import * as React from 'react';
 import { List, ListItemButton, ListItemText, Collapse, Box, IconButton } from '@mui/material';
 import { ExpandLess, ExpandMore } from '@mui/icons-material';
-import { IsExternalLink } from '../../utils/IsExternalLink';
-import { useNavigate } from 'react-router-dom';
+import { useHandleNavigate } from '../../hooks/useHandleNavigate';
 
-function NavBtnList({ lists, handleCloseNavMenu }) {
-  let navigate = useNavigate();
+function NavBtnList({ lists }) {
 
   const [openList, setOpenList] = React.useState({});
 
@@ -18,14 +16,7 @@ function NavBtnList({ lists, handleCloseNavMenu }) {
     }));
   };
 
-  const NavigateToLink = (target) => {
-    handleCloseNavMenu();
-    if (IsExternalLink(target)) {
-      window.open(target)
-    } else {
-      navigate(target);
-    }
-  };
+  const handleNavigate = useHandleNavigate();
 
   return (
     <List
@@ -36,7 +27,7 @@ function NavBtnList({ lists, handleCloseNavMenu }) {
       {lists.map((list) => (
         <Box data-testid="list-item" key={list.name}>
           <ListItemButton>
-            <ListItemText primary={list.name} onClick={() => NavigateToLink(list.target)} />
+            <ListItemText primary={list.name} onClick={() => handleNavigate(list.target)} />
 
             {list.sub &&
               <IconButton onClick={(e) => handleClick(e, list.name)}>
@@ -49,7 +40,7 @@ function NavBtnList({ lists, handleCloseNavMenu }) {
             <Collapse in={openList[list.name]} timeout="auto" unmountOnExit>
               <List component="div" disablePadding>
                 {list.sub.map((subItem, subIndex) => (
-                  <ListItemButton key={subIndex} sx={{ pl: 4 }} onClick={() => NavigateToLink(subItem.target)}>
+                  <ListItemButton key={subIndex} sx={{ pl: 4 }} onClick={() => handleNavigate(subItem.target)}>
                     <ListItemText primary={subItem.name} />
                   </ListItemButton>
                 ))}
