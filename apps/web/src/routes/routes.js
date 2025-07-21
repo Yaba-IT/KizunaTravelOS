@@ -4,8 +4,6 @@ import lazyLoad from '../utils/lazyLaoad';
 //  Shared Views
 import HomePage from '../views/anon/HomePage';
 import ErrorPage from '../views/anon/ErrorPage';
-import ProductsPage from '../views/anon/ProductsPage';
-import ContactPage from '../views/anon/ContactPage';
 
 const routesDefinitions = [
   //anon = no auth user
@@ -13,21 +11,6 @@ const routesDefinitions = [
     path: '/',
     isProtected: false,
     element: HomePage,
-  },
-  {
-    path: '/products',
-    isProtected: false,
-    element: ProductsPage,
-  },
-  {
-    path: '/products/blog',
-    isProtected: false,
-    element: ContactPage,
-  },
-  {
-    path: '/contact',
-    isProtected: false,
-    element: ContactPage,
   },
 ];
 
