@@ -9,7 +9,7 @@ import NavBtnItem from '../NavBtnItem';
 import NavBtnList from '../NavBtnList';
 
 
-function NavBtn({links}) {
+function NavBtn({ links }) {
   const [anchorElNav, setAnchorElNav] = useState(null);
 
   const handleOpenNavMenu = (event) => {
@@ -50,11 +50,11 @@ function NavBtn({links}) {
           onClose={handleCloseNavMenu}
           sx={{ display: { xs: 'block', md: 'none' } }}
         >
-          <NavBtnList lists={links} handleCloseNavMenu={handleCloseNavMenu}/>
+          <NavBtnList lists={links} handleCloseNavMenu={handleCloseNavMenu} />
         </Menu>
       </Box>
       <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
-        {links.map(({name, target, sub}, key) => (
+        {links.map(({ name, target, sub }, key) => (
           <NavBtnItem key={key} name={name} target={target} sub={sub} />
         ))}
       </Box>

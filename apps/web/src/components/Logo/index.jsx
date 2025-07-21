@@ -1,11 +1,9 @@
-import { Box } from '@mui/material';
 import React from 'react';
+import { Box } from '@mui/material';
 
-const Logo = ({srcUrl, ...props}) => {
-  const i = srcUrl.split('/').length - 1;
-  console.log(i);
+function Logo ({srcUrl, ...props}) {
   return (
-    <Box component={"img"} src={srcUrl} alt={`${srcUrl.split('/')[i]}-image`} {...props} />
+    <Box component={"img"} onClick={console.log('logo')} src={srcUrl} alt={'logo'} {...props} />
   );
 }
 

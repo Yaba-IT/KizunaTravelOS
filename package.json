@@ -1,7 +1,8 @@
 {
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
-    "@commitlint/config-conventional": "^19.8.1"
+    "@commitlint/config-conventional": "^19.8.1",
+    "jest": "^30.0.4"
   },
   "scripts": {
     "build": "babel src -d lib",

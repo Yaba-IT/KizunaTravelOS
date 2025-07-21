@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { List, ListItemButton, ListItemText, Collapse, Box, IconButton } from '@mui/material';
 import { ExpandLess, ExpandMore } from '@mui/icons-material';
-import { useHandleNavigate } from '../../hooks/useHandleNavigate';
+import { useHandleNavigate } from '../../utils/utils';
 
 function NavBtnList({ lists }) {
 

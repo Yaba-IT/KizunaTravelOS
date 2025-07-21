@@ -1,5 +1,5 @@
 const navbarItemsLists = {
-    logo: "/src/assets/img/logo.png",
+    logo: "../src/assets/img/logo.png",
     navigationElements: [
         {
             name: "Home",

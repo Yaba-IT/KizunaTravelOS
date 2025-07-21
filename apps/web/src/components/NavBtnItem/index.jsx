@@ -3,7 +3,7 @@ import { styled, alpha } from '@mui/material/styles';
 import { Typography, MenuItem, Menu, Button, Box } from '@mui/material';
 import { ExpandLess, ExpandMore } from '@mui/icons-material';
 import PropTypes from 'prop-types';
-import { useHandleNavigate } from '../../hooks/useHandleNavigate';
+import { useHandleNavigate } from '../../utils/utils';
 
 const StyledMenu = styled((props) => (
   <Menu
