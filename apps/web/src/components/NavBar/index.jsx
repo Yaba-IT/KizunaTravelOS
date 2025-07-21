@@ -10,13 +10,16 @@ import NavBtn from '../NavBtn';
 import PropTypes from 'prop-types';
 import lazyLoad from '../../utils/lazyLaoad';
 import Logo from '../Logo';
+import { useHandleNavigate } from '../../utils/utils';
 function NavBar({ logo, navigationElements }, ...props) {
-
+const goHome = useHandleNavigate();
   return (
     <AppBar data-testid="app-bar" position="static" sx={{ backgroundColor: "#152e44" }}>
       <Container maxWidth="xl">
         <Box sx={{ display: "flex", w: 100, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          {logo && lazyLoad(() => (<Logo srcUrl={logo} height={65} />))}
+          <Button onClick={() => goHome("/")} disableRipple>
+            {logo && lazyLoad(() => (<Logo srcUrl={logo} height={65} />))}
+          </Button>
           <NavBtn links={navigationElements} />
           <Button
             variant="contained"
