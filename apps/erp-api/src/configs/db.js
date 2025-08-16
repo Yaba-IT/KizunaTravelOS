@@ -1,3 +1,11 @@
+/* Yaba-IT/KizunaTravelOS
+*
+* apps/erp-api/src/configs/db.js - Database connection configuration
+* Manages MongoDB connection and error handling
+*
+* coded by farid212@Yaba-IT!
+*/
+
 require('dotenv').config();
 const mongoose = require('mongoose');
 
