@@ -1,3 +1,11 @@
+/* Yaba-IT/KizunaTravelOS
+*
+* apps/erp-api/src/models/Meta.js - Metadata schema for tracking and auditing
+* Provides audit trail and data lifecycle management
+*
+* coded by farid212@Yaba-IT!
+*/
+
 const { Schema } = require('mongoose');
 
 const metaSchema = new Schema({

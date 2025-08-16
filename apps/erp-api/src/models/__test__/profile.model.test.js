@@ -1,6 +1,14 @@
+/* Yaba-IT/KizunaTravelOS
+*
+* apps/erp-api/src/models/__test__/profile.model.test.js - Profile model tests
+* Tests profile schema validation and data management
+*
+* coded by farid212@Yaba-IT!
+*/
+
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const Profile = require('../Profile'); // adapte le chemin si besoin
+const Profile = require('../Profile'); 
 
 let mongoServer;
 
