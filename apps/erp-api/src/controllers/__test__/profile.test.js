@@ -1,256 +1,621 @@
-const profileCtrl = require('../profile');
+/* Yaba-IT/KizunaTravelOS
+*
+* apps/erp-api/src/controllers/__test__/profile.test.js - Profile controller tests
+* Tests profile management and data handling functionality
+*
+* coded by farid212@Yaba-IT!
+*/
+
+const request = require('supertest');
+const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
+const express = require('express');
+
+// Import models and controller
+const User = require('../../models/User');
 const Profile = require('../../models/Profile');
-const { supabase } = require('../../configs/config');
+const profileController = require('../profile');
 
-jest.mock('../../models/Profile');
-jest.mock('../../configs/config', () => ({
-  supabase: {
-    auth: {
-      admin: {
-        createUser: jest.fn(),
-      },
-    },
-  },
-}));
+// Create Express app for testing
+const app = express();
+app.use(express.json());
 
-const mockRes = () => {
-  const res = {};
-  res.status = jest.fn().mockReturnValue(res);
-  res.json = jest.fn().mockReturnValue(res);
-  res.end = jest.fn();
-  return res;
+// Mock auth middleware
+const mockAuth = (req, res, next) => {
+  req.user = { id: 'mocked-user-id', role: 'admin' };
+  next();
 };
 
-describe('User Controller', () => {
-  afterEach(() => {
-    jest.clearAllMocks();
+// Mock authorize middleware
+const mockAuthorize = (roles) => (req, res, next) => {
+  if (roles.includes(req.user.role)) {
+    next();
+  } else {
+    res.status(403).json({ error: 'Forbidden' });
+  }
+};
+
+// Apply routes
+app.get('/me', mockAuth, profileController.getMyProfile);
+app.put('/me', mockAuth, profileController.updateMyProfile);
+app.get('/:id', mockAuth, mockAuthorize(['admin']), profileController.getProfileById);
+app.put('/:id', mockAuth, mockAuthorize(['admin']), profileController.updateProfileById);
+app.get('/', mockAuth, mockAuthorize(['admin']), profileController.getAllProfiles);
+app.post('/:id/restore', mockAuth, mockAuthorize(['admin']), profileController.restoreProfile);
+app.get('/stats', mockAuth, mockAuthorize(['admin']), profileController.getProfileStats);
+
+describe('Profile Controller', () => {
+  let mongoServer;
+
+  beforeAll(async () => {
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    await mongoose.connect(mongoUri);
   });
 
-  describe('createUser', () => {
-    it('returns 400 if email or password missing', async () => {
-      const req = { body: { email: '', password: '' } };
-      const res = mockRes();
-      await profileCtrl.createUser(req, res);
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Email and password are required' });
-    });
+  afterAll(async () => {
+    await mongoose.disconnect();
+    await mongoServer.stop();
+  });
 
-    it('returns 400 if Supabase returns error', async () => {
-      const req = { body: { email: 'test@mail.com', password: '1234' } };
-      const res = mockRes();
-      supabase.auth.admin.createUser.mockResolvedValue({
-        data: null,
-        error: { message: 'Supabase fail' },
+  beforeEach(async () => {
+    await User.deleteMany({});
+    await Profile.deleteMany({});
+  });
+
+  describe('GET /me', () => {
+    it('should return current user profile', async () => {
+      // Create a test user with profile
+      const user = new User({
+        email: 'test@example.com',
+        password: 'SecurePass123!',
+        role: 'customer'
       });
-      await profileCtrl.createUser(req, res);
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Supabase fail' });
-    });
+      await user.save();
 
-    it('returns 409 if profile already exists', async () => {
-      const req = { body: { email: 'test@mail.com', password: '1234' } };
-      const res = mockRes();
-      supabase.auth.admin.createUser.mockResolvedValue({
-        data: { user: { id: 'user-1' } },
-        error: null,
+      const profile = new Profile({
+        userId: user._id.toString(),
+        firstname: 'John',
+        lastname: 'Doe',
+        sexe: 'M'
       });
-      Profile.findOne.mockResolvedValue({ userId: 'user-1' });
-      await profileCtrl.createUser(req, res);
-      expect(res.status).toHaveBeenCalledWith(409);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Profile already exists' });
-    });
+      await profile.save();
 
-    it('creates profile and returns 201', async () => {
-      const req = { body: { email: 'test@mail.com', password: '1234', foo: 'bar' } };
-      const res = mockRes();
-      supabase.auth.admin.createUser.mockResolvedValue({
-        data: { user: { id: 'user-1' } },
-        error: null,
+      // Update user with profile reference
+      user.profileId = profile._id;
+      await user.save();
+
+      // Mock req.user.id to match the created user
+      const mockReq = { user: { id: user._id.toString() } };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.getMyProfile(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith({
+        profile: expect.objectContaining({
+          firstname: 'John',
+          lastname: 'Doe',
+          sexe: 'M'
+        }),
+        user: expect.objectContaining({
+          email: 'test@example.com',
+          role: 'customer'
+        })
       });
-      Profile.findOne.mockResolvedValue(null);
-      Profile.create.mockResolvedValue({ userId: 'user-1', foo: 'bar' });
-      await profileCtrl.createUser(req, res);
-      expect(res.status).toHaveBeenCalledWith(201);
-      expect(res.json).toHaveBeenCalledWith({ userId: 'user-1', foo: 'bar' });
     });
 
-    it('returns 500 on unknown error', async () => {
-      const req = { body: { email: 'test@mail.com', password: '1234', foo: 'bar' } };
-      const res = mockRes();
-      supabase.auth.admin.createUser.mockRejectedValue(new Error('oops'));
-      await profileCtrl.createUser(req, res);
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
-    });
-  });
+    it('should return 404 if user not found', async () => {
+      const mockReq = { user: { id: 'non-existent-id' } };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
 
-  describe('getUserById', () => {
-    it('returns profile if found', async () => {
-      const req = { params: { id: 'id1' } };
-      const res = mockRes();
-      Profile.findById.mockResolvedValue({ userId: 'user-1' });
-      await profileCtrl.getUserById(req, res);
-      expect(res.json).toHaveBeenCalledWith({ userId: 'user-1' });
+      await profileController.getMyProfile(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'User not found'
+      });
     });
 
-    it('returns 404 if not found', async () => {
-      const req = { params: { id: 'id1' } };
-      const res = mockRes();
-      Profile.findById.mockResolvedValue(null);
-      await profileCtrl.getUserById(req, res);
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Profile not found' });
-    });
+    it('should return 404 if profile not found', async () => {
+      // Create user without profile
+      const user = new User({
+        email: 'test@example.com',
+        password: 'SecurePass123!',
+        role: 'customer'
+      });
+      await user.save();
 
-    it('returns 500 on error', async () => {
-      const req = { params: { id: 'id1' } };
-      const res = mockRes();
-      Profile.findById.mockRejectedValue(new Error('fail'));
-      await profileCtrl.getUserById(req, res);
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
+      const mockReq = { user: { id: user._id.toString() } };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.getMyProfile(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Profile not found'
+      });
     });
   });
 
-  describe('updateUserById', () => {
-    it('returns updated profile', async () => {
-      const req = { params: { id: 'id1' }, body: { foo: 'bar' } };
-      const res = mockRes();
-      Profile.findByIdAndUpdate.mockResolvedValue({ userId: 'id1', foo: 'bar' });
-      await profileCtrl.updateUserById(req, res);
-      expect(res.json).toHaveBeenCalledWith({ userId: 'id1', foo: 'bar' });
+  describe('PUT /me', () => {
+    it('should update current user profile', async () => {
+      // Create a test user with profile
+      const user = new User({
+        email: 'test@example.com',
+        password: 'SecurePass123!',
+        role: 'customer'
+      });
+      await user.save();
+
+      const profile = new Profile({
+        userId: user._id.toString(),
+        firstname: 'John',
+        lastname: 'Doe',
+        sexe: 'M'
+      });
+      await profile.save();
+
+      user.profileId = profile._id;
+      await user.save();
+
+      const updateData = {
+        firstname: 'Jane',
+        lastname: 'Smith',
+        sexe: 'F'
+      };
+
+      const mockReq = {
+        user: { id: user._id.toString() },
+        body: updateData
+      };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.updateMyProfile(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith({
+        message: 'Profile updated successfully',
+        profile: expect.objectContaining({
+          firstname: 'Jane',
+          lastname: 'Smith',
+          sexe: 'F'
+        })
+      });
     });
 
-    it('returns 404 if not found', async () => {
-      const req = { params: { id: 'id1' }, body: {} };
-      const res = mockRes();
-      Profile.findByIdAndUpdate.mockResolvedValue(null);
-      await profileCtrl.updateUserById(req, res);
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Profile not found' });
-    });
+    it('should handle partial updates', async () => {
+      // Create a test user with profile
+      const user = new User({
+        email: 'test@example.com',
+        password: 'SecurePass123!',
+        role: 'customer'
+      });
+      await user.save();
 
-    it('returns 500 on error', async () => {
-      const req = { params: { id: 'id1' }, body: {} };
-      const res = mockRes();
-      Profile.findByIdAndUpdate.mockRejectedValue(new Error('fail'));
-      await profileCtrl.updateUserById(req, res);
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
-    });
-  });
+      const profile = new Profile({
+        userId: user._id.toString(),
+        firstname: 'John',
+        lastname: 'Doe',
+        sexe: 'M'
+      });
+      await profile.save();
 
-  describe('deleteUserById', () => {
-    it('returns 204 if deleted', async () => {
-      const req = { params: { id: 'id1' } };
-      const res = mockRes();
-      Profile.findByIdAndDelete.mockResolvedValue({ userId: 'id1' });
-      await profileCtrl.deleteUserById(req, res);
-      expect(res.status).toHaveBeenCalledWith(204);
-      expect(res.end).toHaveBeenCalled();
-    });
+      user.profileId = profile._id;
+      await user.save();
 
-    it('returns 404 if not found', async () => {
-      const req = { params: { id: 'id1' } };
-      const res = mockRes();
-      Profile.findByIdAndDelete.mockResolvedValue(null);
-      await profileCtrl.deleteUserById(req, res);
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Profile not found' });
-    });
+      const updateData = {
+        firstname: 'Jane'
+      };
 
-    it('returns 500 on error', async () => {
-      const req = { params: { id: 'id1' } };
-      const res = mockRes();
-      Profile.findByIdAndDelete.mockRejectedValue(new Error('fail'));
-      await profileCtrl.deleteUserById(req, res);
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
-    });
-  });
+      const mockReq = {
+        user: { id: user._id.toString() },
+        body: updateData
+      };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
 
-  describe('getMyProfile', () => {
-    it('returns profile if found', async () => {
-      const req = { user: { id: 'user-1' } };
-      const res = mockRes();
-      Profile.findOne.mockResolvedValue({ userId: 'user-1' });
-      await profileCtrl.getMyProfile(req, res);
-      expect(res.json).toHaveBeenCalledWith({ userId: 'user-1' });
-    });
+      await profileController.updateMyProfile(mockReq, mockRes);
 
-    it('returns 404 if not found', async () => {
-      const req = { user: { id: 'user-1' } };
-      const res = mockRes();
-      Profile.findOne.mockResolvedValue(null);
-      await profileCtrl.getMyProfile(req, res);
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Profile not found' });
-    });
-
-    it('returns 500 on error', async () => {
-      const req = { user: { id: 'user-1' } };
-      const res = mockRes();
-      Profile.findOne.mockRejectedValue(new Error('fail'));
-      await profileCtrl.getMyProfile(req, res);
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
-    });
-  });
-
-  describe('updateMyProfile', () => {
-    it('returns updated profile', async () => {
-      const req = { user: { id: 'user-1' }, body: { foo: 'bar' } };
-      const res = mockRes();
-      Profile.findOneAndUpdate.mockResolvedValue({ userId: 'user-1', foo: 'bar' });
-      await profileCtrl.updateMyProfile(req, res);
-      expect(res.json).toHaveBeenCalledWith({ userId: 'user-1', foo: 'bar' });
-    });
-
-    it('returns 404 if not found', async () => {
-      const req = { user: { id: 'user-1' }, body: {} };
-      const res = mockRes();
-      Profile.findOneAndUpdate.mockResolvedValue(null);
-      await profileCtrl.updateMyProfile(req, res);
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Profile not found' });
-    });
-
-    it('returns 500 on error', async () => {
-      const req = { user: { id: 'user-1' }, body: {} };
-      const res = mockRes();
-      Profile.findOneAndUpdate.mockRejectedValue(new Error('fail'));
-      await profileCtrl.updateMyProfile(req, res);
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
+      expect(mockRes.json).toHaveBeenCalledWith({
+        message: 'Profile updated successfully',
+        profile: expect.objectContaining({
+          firstname: 'Jane',
+          lastname: 'Doe', // Should remain unchanged
+          sexe: 'M' // Should remain unchanged
+        })
+      });
     });
   });
 
-  describe('deleteMyProfile', () => {
-    it('returns 204 if deleted', async () => {
-      const req = { user: { id: 'user-1' } };
-      const res = mockRes();
-      Profile.findOneAndDelete.mockResolvedValue({ userId: 'user-1' });
-      await profileCtrl.deleteMyProfile(req, res);
-      expect(res.status).toHaveBeenCalledWith(204);
-      expect(res.end).toHaveBeenCalled();
+  describe('GET /:id', () => {
+    it('should return profile by ID with user info', async () => {
+      // Create a test user with profile
+      const user = new User({
+        email: 'test@example.com',
+        password: 'SecurePass123!',
+        role: 'customer'
+      });
+      await user.save();
+
+      const profile = new Profile({
+        userId: user._id.toString(),
+        firstname: 'John',
+        lastname: 'Doe',
+        sexe: 'M'
+      });
+      await profile.save();
+
+      user.profileId = profile._id;
+      await user.save();
+
+      const mockReq = { params: { id: profile._id.toString() } };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.getProfileById(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith({
+        profile: expect.objectContaining({
+          firstname: 'John',
+          lastname: 'Doe',
+          sexe: 'M'
+        }),
+        user: expect.objectContaining({
+          email: 'test@example.com',
+          role: 'customer'
+        })
+      });
     });
 
-    it('returns 404 if not found', async () => {
-      const req = { user: { id: 'user-1' } };
-      const res = mockRes();
-      Profile.findOneAndDelete.mockResolvedValue(null);
-      await profileCtrl.deleteMyProfile(req, res);
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Profile not found' });
+    it('should return 404 for non-existent profile', async () => {
+      const fakeId = new mongoose.Types.ObjectId();
+      const mockReq = { params: { id: fakeId.toString() } };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.getProfileById(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Profile not found'
+      });
     });
 
-    it('returns 500 on error', async () => {
-      const req = { user: { id: 'user-1' } };
-      const res = mockRes();
-      Profile.findOneAndDelete.mockRejectedValue(new Error('fail'));
-      await profileCtrl.deleteMyProfile(req, res);
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
+    it('should return 404 for deleted profile', async () => {
+      // Create a test user with profile
+      const user = new User({
+        email: 'test@example.com',
+        password: 'SecurePass123!',
+        role: 'customer'
+      });
+      await user.save();
+
+      const profile = new Profile({
+        userId: user._id.toString(),
+        firstname: 'John',
+        lastname: 'Doe',
+        sexe: 'M'
+      });
+      await profile.save();
+
+      // Soft delete the profile
+      profile.meta.softDelete(user._id);
+      await profile.save();
+
+      const mockReq = { params: { id: profile._id.toString() } };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.getProfileById(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Profile not found'
+      });
+    });
+  });
+
+  describe('PUT /:id', () => {
+    it('should update profile by ID', async () => {
+      // Create a test user with profile
+      const user = new User({
+        email: 'test@example.com',
+        password: 'SecurePass123!',
+        role: 'customer'
+      });
+      await user.save();
+
+      const profile = new Profile({
+        userId: user._id.toString(),
+        firstname: 'John',
+        lastname: 'Doe',
+        sexe: 'M'
+      });
+      await profile.save();
+
+      const updateData = {
+        firstname: 'Jane',
+        lastname: 'Smith'
+      };
+
+      const mockReq = {
+        params: { id: profile._id.toString() },
+        body: updateData,
+        user: { id: 'admin-id' }
+      };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.updateProfileById(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith({
+        message: 'Profile updated successfully',
+        profile: expect.objectContaining({
+          firstname: 'Jane',
+          lastname: 'Smith'
+        })
+      });
+    });
+  });
+
+  describe('GET /', () => {
+    beforeEach(async () => {
+      // Create test users with profiles
+      const users = [
+        {
+          email: 'user1@example.com',
+          password: 'SecurePass123!',
+          role: 'customer'
+        },
+        {
+          email: 'user2@example.com',
+          password: 'SecurePass123!',
+          role: 'guide'
+        }
+      ];
+
+      for (const userData of users) {
+        const user = new User(userData);
+        await user.save();
+
+        const profile = new Profile({
+          userId: user._id.toString(),
+          firstname: 'Test',
+          lastname: 'User',
+          sexe: 'X'
+        });
+        await profile.save();
+
+        user.profileId = profile._id;
+        await user.save();
+      }
+    });
+
+    it('should return all profiles with pagination', async () => {
+      const mockReq = { query: {} };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.getAllProfiles(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith({
+        profiles: expect.arrayContaining([
+          expect.objectContaining({
+            profile: expect.any(Object),
+            user: expect.any(Object)
+          })
+        ]),
+        pagination: expect.objectContaining({
+          page: 1,
+          limit: 10,
+          total: 2,
+          pages: 1
+        })
+      });
+    });
+
+    it('should filter profiles by search term', async () => {
+      const mockReq = { query: { search: 'Test' } };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.getAllProfiles(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith({
+        profiles: expect.arrayContaining([
+          expect.objectContaining({
+            profile: expect.objectContaining({
+              firstname: 'Test'
+            })
+          })
+        ]),
+        pagination: expect.any(Object)
+      });
+    });
+  });
+
+  describe('POST /:id/restore', () => {
+    it('should restore deleted profile', async () => {
+      // Create a test user with profile
+      const user = new User({
+        email: 'test@example.com',
+        password: 'SecurePass123!',
+        role: 'customer'
+      });
+      await user.save();
+
+      const profile = new Profile({
+        userId: user._id.toString(),
+        firstname: 'John',
+        lastname: 'Doe',
+        sexe: 'M'
+      });
+      await profile.save();
+
+      // Soft delete the profile
+      profile.meta.softDelete(user._id);
+      await profile.save();
+
+      const mockReq = {
+        params: { id: profile._id.toString() },
+        user: { id: 'admin-id' }
+      };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.restoreProfile(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith({
+        message: 'Profile restored successfully',
+        profile: expect.objectContaining({
+          meta: expect.objectContaining({
+            isDeleted: false
+          })
+        })
+      });
+    });
+
+    it('should return 400 if profile is not deleted', async () => {
+      // Create a test user with profile
+      const user = new User({
+        email: 'test@example.com',
+        password: 'SecurePass123!',
+        role: 'customer'
+      });
+      await user.save();
+
+      const profile = new Profile({
+        userId: user._id.toString(),
+        firstname: 'John',
+        lastname: 'Doe',
+        sexe: 'M'
+      });
+      await profile.save();
+
+      const mockReq = {
+        params: { id: profile._id.toString() },
+        user: { id: 'admin-id' }
+      };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.restoreProfile(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Profile is not deleted'
+      });
+    });
+  });
+
+  describe('GET /stats', () => {
+    beforeEach(async () => {
+      // Create test users with profiles
+      const users = [
+        {
+          email: 'user1@example.com',
+          password: 'SecurePass123!',
+          role: 'customer'
+        },
+        {
+          email: 'user2@example.com',
+          password: 'SecurePass123!',
+          role: 'guide'
+        }
+      ];
+
+      for (const userData of users) {
+        const user = new User(userData);
+        await user.save();
+
+        const profile = new Profile({
+          userId: user._id.toString(),
+          firstname: 'Test',
+          lastname: 'User',
+          sexe: 'X'
+        });
+        await profile.save();
+
+        user.profileId = profile._id;
+        await user.save();
+      }
+    });
+
+    it('should return profile statistics', async () => {
+      const mockReq = {};
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.getProfileStats(mockReq, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith({
+        stats: expect.objectContaining({
+          total: 2,
+          deleted: 0,
+          recent: 2,
+          bySexe: expect.arrayContaining([
+            expect.objectContaining({
+              _id: 'X',
+              count: 2
+            })
+          ])
+        })
+      });
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle database errors gracefully', async () => {
+      // Mock Profile.findById to throw error
+      const originalFindById = Profile.findById;
+      Profile.findById = jest.fn().mockRejectedValue(new Error('Database error'));
+
+      const mockReq = { params: { id: 'fake-id' } };
+      const mockRes = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis()
+      };
+
+      await profileController.getProfileById(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(500);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Internal server error'
+      });
+
+      // Restore original method
+      Profile.findById = originalFindById;
     });
   });
 });
