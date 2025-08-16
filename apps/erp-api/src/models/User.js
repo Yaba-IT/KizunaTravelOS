@@ -1,3 +1,11 @@
+/* Yaba-IT/KizunaTravelOS
+*
+* apps/erp-api/src/models/User.js - User data model
+* Defines user schema and authentication methods
+*
+* coded by farid212@Yaba-IT!
+*/
+
 const { Schema, model } = require('mongoose');
 const bcrypt = require('bcryptjs');
 const metaSchema = require('./Meta');
@@ -20,7 +28,7 @@ const userSchema = new Schema({
     minlength: [8, 'Password must be at least 8 characters long'],
     validate: {
       validator: function(password) {
-        // At least one uppercase, one lowercase, one number, one special character
+        // At least one uppercase, one lowercase, one number, one special character 
         const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
         return passwordRegex.test(password);
       },
@@ -112,28 +120,7 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Pre-save middleware to handle profile creation
-userSchema.pre('save', async function(next) {
-  if (this.isNew && !this.profileId) {
-    try {
-      const Profile = require('./Profile');
-      const profile = new Profile({
-        userId: this._id.toString(),
-        firstname: '',
-        lastname: '',
-        sexe: 'X'
-      });
-      await profile.save();
-      this.profileId = profile._id;
-      next();
-    } catch (error) {
-      next(error);
-    }
-  } else {
-    next();
-  }
-});
-
+// Remove the problematic profile creation middleware - profiles should be created explicitly
 // Pre-save middleware to ensure meta exists
 userSchema.pre('save', function(next) {
   if (!this.meta) {
