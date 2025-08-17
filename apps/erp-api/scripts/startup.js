@@ -8,6 +8,7 @@
 * coded by farid212@Yaba-IT!
 */
 
+require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
@@ -233,7 +234,11 @@ class StartupValidator {
     if (majorVersion >= 20) {
       this.addSuccess(`Node.js version ${nodeVersion} meets requirement (20+)`);
     } else {
-      this.addError(`Node.js version ${nodeVersion} does not meet requirement (20+ required)`);
+      if (process.env.NODE_ENV === 'production') {
+        this.addError(`Node.js version ${nodeVersion} does not meet requirement (20+ required)`);
+      } else {
+        this.addWarning(`Node.js version ${nodeVersion} does not meet requirement (20+ required for production)`);
+      }
     }
   }
 
@@ -250,7 +255,11 @@ class StartupValidator {
       }
       
       if (jwtSecret === 'your-super-secret-jwt-key-change-in-production') {
-        this.addError('JWT secret is using default value - CHANGE IN PRODUCTION!');
+        if (process.env.NODE_ENV === 'production') {
+          this.addError('JWT secret is using default value - CHANGE IN PRODUCTION!');
+        } else {
+          this.addWarning('JWT secret is using default value - CHANGE IN PRODUCTION!');
+        }
       }
     }
 
