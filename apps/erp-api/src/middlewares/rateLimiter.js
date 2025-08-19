@@ -20,13 +20,18 @@ if (!fs.existsSync(logsDir)) {
 
 // Helper function to write log
 const writeLog = (filename, data) => {
-  const logFile = path.join(logsDir, filename);
-  const logEntry = JSON.stringify({
-    ...data,
-    timestamp: new Date().toISOString()
-  }, null, 2);
-  
-  fs.appendFileSync(logFile, logEntry + '\n', 'utf8');
+  try {
+    const logFile = path.join(logsDir, filename);
+    const logEntry = JSON.stringify({
+      ...data,
+      timestamp: new Date().toISOString()
+    }, null, 2);
+    
+    fs.appendFileSync(logFile, logEntry + '\n', 'utf8');
+  } catch (error) {
+    // Silently fail if logging fails - don't break the rate limiting functionality
+    console.warn('Rate limiter logging failed:', error.message);
+  }
 };
 
 // Helper function to get client identifier
@@ -261,6 +266,7 @@ const rateLimiters = {
 module.exports = {
   createRateLimiter,
   rateLimiters,
+  rateLimitStore, // Export for testing
   // Convenience function to apply rate limiting to specific routes
   applyRateLimiting: (app, routes) => {
     Object.entries(routes).forEach(([path, limiter]) => {
