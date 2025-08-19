@@ -8,9 +8,12 @@
 * coded by farid212@Yaba-IT!
 */
 
-require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+// Resolve app root (apps/erp-api)
+const appRoot = path.resolve(__dirname, '..');
+// Load .env from the app root explicitly so it works regardless of CWD
+require('dotenv').config({ path: path.join(appRoot, '.env') });
 const mongoose = require('mongoose');
 
 // Colors for console output
@@ -64,7 +67,13 @@ class StartupValidator {
     ];
 
     for (const envVar of requiredEnvVars) {
-      if (process.env[envVar]) {
+      if (envVar === 'MONGODB_URI') {
+        if (process.env.MONGODB_URI || process.env.MONGO_URI || process.env.VITE_MONGO_URI) {
+          this.addSuccess(`Environment variable ${envVar} is set (or MONGO_URI/VITE_MONGO_URI)`);
+        } else {
+          this.addError(`Missing required environment variable: ${envVar} (or MONGO_URI)`);
+        }
+      } else if (process.env[envVar]) {
         this.addSuccess(`Environment variable ${envVar} is set`);
       } else {
         this.addError(`Missing required environment variable: ${envVar}`);
@@ -123,7 +132,7 @@ class StartupValidator {
     ];
 
     for (const file of requiredFiles) {
-      const filePath = path.join(process.cwd(), file);
+      const filePath = path.join(appRoot, file);
       if (fs.existsSync(filePath)) {
         this.addSuccess(`File exists: ${file}`);
       } else {
@@ -136,7 +145,7 @@ class StartupValidator {
     log.header('📦 Validating Dependencies');
     
     try {
-      const packageJsonPath = path.join(process.cwd(), 'package.json');
+      const packageJsonPath = path.join(appRoot, 'package.json');
       if (!fs.existsSync(packageJsonPath)) {
         this.addError('package.json not found');
         return;
@@ -200,9 +209,9 @@ class StartupValidator {
     log.header('🗄️ Validating Database Connection');
     
     try {
-      const mongoUri = process.env.MONGODB_URI;
+      const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || process.env.VITE_MONGO_URI;
       if (!mongoUri) {
-        this.addError('MONGODB_URI not set, cannot test database connection');
+        this.addError('MONGODB_URI (or MONGO_URI) not set, cannot test database connection');
         return;
       }
 
@@ -278,6 +287,7 @@ class StartupValidator {
   async runValidation() {
     log.header('🚀 ERP API Startup Validation');
     log.info('Starting comprehensive system validation...\n');
+    log.info(`Base directory: ${appRoot}`);
 
     await this.validateNodeVersion();
     await this.validateEnvironment();
