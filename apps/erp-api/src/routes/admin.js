@@ -1,85 +1,89 @@
 /* Yaba-IT/KizunaTravelOS
-*
-* apps/erp-api/src/routes/admin.js - Admin routes for system management
-* Provides full system administration capabilities
-*
-* coded by farid212@Yaba-IT!
-*/
+ * apps/erp-api/src/routes/admin.js
+ */
 
 const express = require('express');
 const auth = require('../middlewares/auth.js');
 const authorize = require('../middlewares/authorize.js');
-const canAccessOwnData = require('../middlewares/canAccessOwnData.js');
-const router = express.Router();
 
-// Import controllers
 const userCtrl = require('../controllers/user.js');
 const profileCtrl = require('../controllers/profile.js');
 const bookingCtrl = require('../controllers/booking.js');
 const journeyCtrl = require('../controllers/journey.js');
 const providerCtrl = require('../controllers/provider.js');
 
-// Admin user management (full access + admin-specific functions)
-router.get('/users', auth, authorize(['admin']), userCtrl.getAllUsers);
-router.get('/users/:userId', auth, authorize(['admin']), userCtrl.getUserById);
-router.post('/users', auth, authorize(['admin']), userCtrl.createUser);
-router.put('/users/:userId', auth, authorize(['admin']), userCtrl.updateUser);
-router.delete('/users/:userId', auth, authorize(['admin']), userCtrl.deleteUser);
-router.post('/users/:userId/status', auth, authorize(['admin']), userCtrl.updateUserStatus);
-router.post('/users/:userId/role', auth, authorize(['admin']), userCtrl.updateUserRole);
-router.post('/users/:userId/activate', auth, authorize(['admin']), userCtrl.activateUser);
-router.post('/users/:userId/deactivate', auth, authorize(['admin']), userCtrl.deactivateUser);
-router.post('/users/:userId/unlock', auth, authorize(['admin']), userCtrl.unlockUser);
-router.get('/users/stats', auth, authorize(['admin']), userCtrl.getUserStats);
+const router = express.Router();
 
-// Admin profile management (full access + admin-specific functions)
-router.get('/profiles', auth, authorize(['admin']), profileCtrl.getAllProfiles);
-router.get('/profiles/:profileId', auth, authorize(['admin']), profileCtrl.getProfileById);
-router.put('/profiles/:profileId', auth, authorize(['admin']), profileCtrl.updateProfileById);
-router.delete('/profiles/:profileId', auth, authorize(['admin']), profileCtrl.deleteProfile);
-router.post('/profiles/:profileId/restore', auth, authorize(['admin']), profileCtrl.restoreProfile);
-router.get('/profiles/stats', auth, authorize(['admin']), profileCtrl.getProfileStats);
+// utils
+const wrap = require('../utils/wrap.js');
+const guardId = require('../utils/guardId.js');
 
-// Admin booking management (full access + admin-specific functions)
-router.get('/bookings', auth, authorize(['admin']), bookingCtrl.getAllBookings);
-router.get('/bookings/:bookingId', auth, authorize(['admin']), bookingCtrl.getBookingById);
-router.post('/bookings', auth, authorize(['admin']), bookingCtrl.createBooking);
-router.put('/bookings/:bookingId', auth, authorize(['admin']), bookingCtrl.updateBooking);
-router.delete('/bookings/:bookingId', auth, authorize(['admin']), bookingCtrl.deleteBooking);
-router.get('/bookings/stats', auth, authorize(['admin']), bookingCtrl.getBookingStats);
+// protect all /admin
+router.use(auth);
+router.use(authorize(['admin']));
 
-// Admin journey management (full access + admin-specific functions)
-router.get('/journeys', auth, authorize(['admin']), journeyCtrl.getAllJourneys);
-router.get('/journeys/:journeyId', auth, authorize(['admin']), journeyCtrl.getJourneyById);
-router.post('/journeys', auth, authorize(['admin']), journeyCtrl.createJourney);
-router.put('/journeys/:journeyId', auth, authorize(['admin']), journeyCtrl.updateJourney);
-router.delete('/journeys/:journeyId', auth, authorize(['admin']), journeyCtrl.deleteJourney);
-router.post('/journeys/:journeyId/assign-guide', auth, authorize(['admin']), journeyCtrl.assignGuide);
-router.get('/journeys/stats', auth, authorize(['admin']), journeyCtrl.getJourneyStats);
+/* Users */
+router.get('/users', wrap(userCtrl.getAllUsers));
+router.get('/users/stats', wrap(userCtrl.getUserStats));
+router.get('/users/:userId', guardId('userId'), wrap(userCtrl.getUserById));
+router.post('/users', wrap(userCtrl.createUser));                  // controller should return 201
+router.put('/users/:userId', guardId('userId'), wrap(userCtrl.updateUser));
+router.delete('/users/:userId', guardId('userId'), wrap(userCtrl.deleteUser));
+router.post('/users/:userId/status', guardId('userId'), wrap(userCtrl.updateUserStatus));
+router.post('/users/:userId/role', guardId('userId'), wrap(userCtrl.updateUserRole));
+router.post('/users/:userId/activate', guardId('userId'), wrap(userCtrl.activateUser));
+router.post('/users/:userId/deactivate', guardId('userId'), wrap(userCtrl.deactivateUser));
+router.post('/users/:userId/unlock', guardId('userId'), wrap(userCtrl.unlockUser));
 
-// Admin provider management (full access + admin-specific functions)
-router.get('/providers', auth, authorize(['admin']), providerCtrl.getAllProviders);
-router.get('/providers/:providerId', auth, authorize(['admin']), providerCtrl.getProviderById);
-router.post('/providers', auth, authorize(['admin']), providerCtrl.createProvider);
-router.put('/providers/:providerId', auth, authorize(['admin']), providerCtrl.updateProvider);
-router.delete('/providers/:providerId', auth, authorize(['admin']), providerCtrl.deleteProvider);
+/* Profiles */
+router.get('/profiles', wrap(profileCtrl.getAllProfiles));
+router.get('/profiles/stats', wrap(profileCtrl.getProfileStats));
+router.get('/profiles/:profileId', guardId('profileId'), wrap(profileCtrl.getProfileById));
+router.put('/profiles/:profileId', guardId('profileId'), wrap(profileCtrl.updateProfileById));
+router.delete('/profiles/:profileId', guardId('profileId'), wrap(profileCtrl.deleteProfile));
+router.post('/profiles/:profileId/restore', guardId('profileId'), wrap(profileCtrl.restoreProfile));
 
-// Admin system management and monitoring
-router.get('/system/stats', auth, authorize(['admin']), userCtrl.getSystemStats);
-router.get('/system/health', auth, authorize(['admin']), userCtrl.getSystemHealth);
-router.get('/system/audit-logs', auth, authorize(['admin']), userCtrl.getAuditLogs);
-router.get('/system/security-events', auth, authorize(['admin']), userCtrl.getSecurityEvents);
+/* Bookings */
+router.get('/bookings', wrap(bookingCtrl.getAllBookings));
+router.get('/bookings/stats', wrap(bookingCtrl.getBookingStats));
+router.get('/bookings/:bookingId', guardId('bookingId'), wrap(bookingCtrl.getBookingById));
+router.post('/bookings', wrap(bookingCtrl.createBooking));         // controller should return 201
+router.put('/bookings/:bookingId', guardId('bookingId'), wrap(bookingCtrl.updateBooking));
+router.delete('/bookings/:bookingId', guardId('bookingId'), wrap(bookingCtrl.deleteBooking));
 
-// Admin role and permission management
-router.get('/roles', auth, authorize(['admin']), userCtrl.getAllRoles);
-router.post('/roles', auth, authorize(['admin']), userCtrl.createRole);
-router.put('/roles/:roleId', auth, authorize(['admin']), userCtrl.updateRole);
-router.delete('/roles/:roleId', auth, authorize(['admin']), userCtrl.deleteRole);
+/* Journeys */
+router.get('/journeys', wrap(journeyCtrl.getAllJourneys));
+router.get('/journeys/stats', wrap(journeyCtrl.getJourneyStats));
+router.get('/journeys/:journeyId', guardId('journeyId'), wrap(journeyCtrl.getJourneyById));
+router.post('/journeys', wrap(journeyCtrl.createJourney));         // controller should return 201
+router.put('/journeys/:journeyId', guardId('journeyId'), wrap(journeyCtrl.updateJourney));
+router.delete('/journeys/:journeyId', guardId('journeyId'), wrap(journeyCtrl.deleteJourney));
+router.post('/journeys/:journeyId/assign-guide', guardId('journeyId'), wrap(journeyCtrl.assignGuide));
 
-// Admin data export and GDPR compliance
-router.get('/export/users', auth, authorize(['admin']), userCtrl.exportUsers);
-router.get('/export/bookings', auth, authorize(['admin']), bookingCtrl.exportBookings);
-router.get('/export/journeys', auth, authorize(['admin']), journeyCtrl.exportJourneys);
+/* Providers */
+// place /search before /:providerId to avoid shadowing
+router.get('/providers', wrap(providerCtrl.getAllProviders));
+router.get('/providers/stats', wrap(providerCtrl.getProviderStats));
+router.get('/providers/search', wrap(providerCtrl.searchProviders));
+router.get('/providers/:providerId', guardId('providerId'), wrap(providerCtrl.getProviderById));
+router.post('/providers', wrap(providerCtrl.createProvider));      // controller should return 201
+router.put('/providers/:providerId', guardId('providerId'), wrap(providerCtrl.updateProvider));
+router.delete('/providers/:providerId', guardId('providerId'), wrap(providerCtrl.deleteProvider));
+router.post('/providers/:providerId/restore', guardId('providerId'), wrap(providerCtrl.restoreProvider));
+
+/* System */
+router.get('/system/stats', wrap(userCtrl.getSystemStats));
+router.get('/system/health', wrap(userCtrl.getSystemHealth));
+router.get('/system/logs', wrap(userCtrl.getAuditLogs));           // alias
+router.get('/system/audit-logs', wrap(userCtrl.getAuditLogs));
+router.get('/system/security-events', wrap(userCtrl.getSecurityEvents));
+router.post('/system/backup', wrap(userCtrl.getSystemBackup));
+router.post('/system/restore', wrap(userCtrl.restoreSystemBackup));
+
+/* Roles */
+router.get('/roles', wrap(userCtrl.getAllRoles));
+router.post('/roles', wrap(userCtrl.createRole));
+router.put('/roles/:roleId', guardId('roleId'), wrap(userCtrl.updateRole));
+router.delete('/roles/:roleId', guardId('roleId'), wrap(userCtrl.deleteRole));
 
 module.exports = router;
-
