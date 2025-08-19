@@ -7,6 +7,7 @@
  * started at 2025-08-16
  */
 
+require('dotenv/config');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -15,7 +16,7 @@ const rateLimit = require('express-rate-limit');
 const slowDown = require('express-slow-down');
 const hpp = require('hpp');
 const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
+const xss = require('xss-clean/lib/xss');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
@@ -47,6 +48,17 @@ if (config.server.nodeEnv === 'production') {
 }
 
 const app = express();
+
+// Temporary route registration logger to locate invalid path patterns
+['use','get','post','put','patch','delete','all'].forEach((method) => {
+  const original = app[method].bind(app);
+  app[method] = (path, ...args) => {
+    if (typeof path === 'string') {
+      console.log('[register]', method.toUpperCase(), path);
+    }
+    return original(path, ...args);
+  };
+});
 const port = config.server.port;
 
 // Connect to MongoDB
@@ -144,10 +156,10 @@ app.use(helmet({
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
-      connectSrc: ["'self'"],
-      upgradeInsecureRequests: true,
+      connectSrc: ["'self'"]
     },
     reportOnly: false,
+    upgradeInsecureRequests: true
   },
   // HTTP Strict Transport Security
   hsts: {
@@ -168,32 +180,28 @@ app.use(helmet({
   hidePoweredBy: true,
   // Prevent IE from executing downloads
   ieNoOpen: true,
-  // Prevent browsers from MIME-sniffing
-  noSniff: true,
   // Referrer Policy for GDPR compliance
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   // Permissions Policy
   permissionsPolicy: {
-    features: {
-      geolocation: ["'self'"],
-      microphone: ["'none'"],
-      camera: ["'none'"],
-      payment: ["'self'"],
-      usb: ["'none'"],
-      magnetometer: ["'none'"],
-      gyroscope: ["'none'"],
-      accelerometer: ["'none'"],
-      ambientLightSensor: ["'none'"],
-      autoplay: ["'none'"],
-      encryptedMedia: ["'none'"],
-      fullscreen: ["'self'"],
-      pictureInPicture: ["'none'"],
-      publickeyCredentialsGet: ["'self'"],
-      screenWakeLock: ["'none'"],
-      syncXhr: ["'self'"],
-      webShare: ["'self'"],
-      xrSpatialTracking: ["'none'"]
-    }
+    geolocation: ["'self'"],
+    microphone: ["'none'"],
+    camera: ["'none'"],
+    payment: ["'self'"],
+    usb: ["'none'"],
+    magnetometer: ["'none'"],
+    gyroscope: ["'none'"],
+    accelerometer: ["'none'"],
+    ambientLightSensor: ["'none'"],
+    autoplay: ["'none'"],
+    encryptedMedia: ["'none'"],
+    fullscreen: ["'self'"],
+    pictureInPicture: ["'none'"],
+    publickeyCredentialsGet: ["'self'"],
+    screenWakeLock: ["'none'"],
+    syncXhr: ["'self'"],
+    webShare: ["'self'"],
+    xrSpatialTracking: ["'none'"]
   }
 }));
 
@@ -283,21 +291,39 @@ app.use(express.urlencoded({
   parameterLimit: config.security.parameterLimit
  }));
 
-// Security middleware for data sanitization
-app.use(mongoSanitize({
-  replaceWith: '_',
-  onSanitize: ({ req, key }) => {
+// Security middleware for data sanitization (compatible with Express 5)
+// Avoid assigning to req.query (getter-only in Express 5)
+app.use((req, res, next) => {
+  const sanitizeOptions = { replaceWith: '_' };
+
+  const logAttempt = (key) => {
     logger.warn(`MongoDB injection attempt detected: ${key}`, {
       ip: req.ip,
       userAgent: req.headers['user-agent'],
       url: req.url,
       method: req.method
     });
-  }
-}));
+  };
 
-// XSS protection
-app.use(xss());
+  if (req.body && mongoSanitize.has(req.body)) logAttempt('body');
+  if (req.params && mongoSanitize.has(req.params)) logAttempt('params');
+  if (req.headers && mongoSanitize.has(req.headers)) logAttempt('headers');
+  if (req.query && mongoSanitize.has(req.query)) logAttempt('query');
+
+  if (req.body) mongoSanitize.sanitize(req.body, sanitizeOptions);
+  if (req.params) mongoSanitize.sanitize(req.params, sanitizeOptions);
+  if (req.headers) mongoSanitize.sanitize(req.headers, sanitizeOptions);
+  if (req.query) mongoSanitize.sanitize(req.query, sanitizeOptions);
+  next();
+});
+
+// XSS protection (compatible with Express 5)
+app.use((req, res, next) => {
+  if (req.body) req.body = xss.clean(req.body);
+  if (req.params) req.params = xss.clean(req.params);
+  // Don't reassign req.query in Express 5
+  next();
+});
 
 // HTTP Parameter Pollution protection
 app.use(hpp({
@@ -352,16 +378,21 @@ const apiLimiter = rateLimit({
 const speedLimiter = slowDown({
   windowMs: 15 * 60 * 1000, // 15 minutes
   delayAfter: 100, // Allow 100 requests per 15 minutes without delay
-  delayMs: 500, // Add 500ms delay per request after 100 requests
-  maxDelayMs: 20000, // Maximum delay of 20 seconds
+  delayMs: () => 500, // Add 500ms delay per request after 100 requests
+  maxDelayMs: (used, req) => {
+    const delayAfter = req.slowDown.limit;
+    return (used - delayAfter) * 20000;
+}, // Maximum delay of 20 seconds
   skipSuccessfulRequests: false,
   skipFailedRequests: false
 });
 
-// Apply rate limiting
-app.use('/auth', strictLimiter);
-app.use('/api', apiLimiter);
-app.use('/', speedLimiter);
+// Apply rate limiting (disabled in test environment)
+if (config.server.nodeEnv !== 'test') {
+  app.use('/auth', strictLimiter);
+  app.use('/api', apiLimiter);
+  app.use('/', speedLimiter);
+}
 
 // Logging middleware (apply at the top to capture all requests)
 applyAllLogging(app);
@@ -418,64 +449,6 @@ app.use((req, res, next) => {
   }
 
   next();
-});
-
-// Health check endpoint with comprehensive status
-app.get('/health', async (req, res) => {
-  const healthCheck = {
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: config.server.nodeEnv,
-    version: config.server.version,
-    services: {
-      database: 'unknown',
-      redis: 'unknown',
-      memory: 'unknown'
-    },
-    system: {
-      memory: process.memoryUsage(),
-      cpu: process.cpuUsage(),
-      platform: process.platform,
-      nodeVersion: process.version
-    }
-  };
-
-  try {
-    // Check database connection
-    const mongoose = require('mongoose');
-    healthCheck.services.database = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-  } catch (error) {
-    healthCheck.services.database = 'error';
-  }
-
-  try {
-    // Check Redis connection
-    if (redisClient && redisClient.connected) {
-      healthCheck.services.redis = 'connected';
-    } else {
-      healthCheck.services.redis = 'disconnected';
-    }
-  } catch (error) {
-    healthCheck.services.redis = 'error';
-  }
-
-  try {
-    // Check memory usage
-    const memUsage = process.memoryUsage();
-    const memUsageMB = {
-      rss: Math.round(memUsage.rss / 1024 / 1024),
-      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
-      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
-      external: Math.round(memUsage.external / 1024 / 1024)
-    };
-    healthCheck.services.memory = memUsageMB;
-  } catch (error) {
-    healthCheck.services.memory = 'error';
-  }
-
-  const statusCode = healthCheck.services.database === 'connected' ? 200 : 503;
-  res.status(statusCode).json(healthCheck);
 });
 
 // Route registration with middleware
@@ -572,8 +545,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler for unmatched routes
-app.use('*', (req, res) => {
+// 404 handler for unmatched routes (match all paths)
+app.use((req, res) => {
   logger.warn('Route not found', {
     method: req.method,
     url: req.originalUrl,
