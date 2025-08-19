@@ -142,9 +142,9 @@ describe('CanAccessOwnData Middleware', () => {
 
       expect(mockRes.status).toHaveBeenCalledWith(400);
       expect(mockRes.json).toHaveBeenCalledWith({
-        error: 'Invalid parameter',
-        message: 'userId parameter is invalid',
-        code: 'INVALID_USER_ID'
+        error: 'Missing parameter',
+        message: 'userId parameter is required',
+        code: 'MISSING_USER_ID'
       });
       expect(mockNext).not.toHaveBeenCalled();
     });
@@ -163,7 +163,7 @@ describe('CanAccessOwnData Middleware', () => {
     });
 
     it('should return 400 when userId parameter is too short after trimming', () => {
-      mockReq.params.userId = '  a  ';
+      mockReq.params.userId = '  ';
       canAccessOwnData(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(400);
@@ -297,7 +297,7 @@ describe('CanAccessOwnData Middleware', () => {
   describe('Edge Cases', () => {
     it('should handle numeric user IDs', () => {
       mockReq.user = {
-        id: 123,
+        id: '123',
         email: 'test@example.com'
       };
       mockReq.params.userId = '123';

@@ -74,23 +74,40 @@ describe('Provider Controller', () => {
     // Create test provider
     testProvider = new Provider({
       name: 'Test Hotel',
+      legalName: 'Test Hotel LLC',
       type: 'hotel',
       description: 'A luxury hotel in the city center',
       contact: {
-        email: 'contact@testhotel.com',
-        phone: '+1234567890'
+        primaryContact: {
+          name: 'John Doe',
+          email: 'contact@testhotel.com',
+          phone: '+1234567890',
+          position: 'Manager'
+        }
       },
       address: {
         street: '123 Main Street',
         city: 'Test City',
         state: 'Test State',
         country: 'Test Country',
-        zipCode: '12345'
+        postalCode: '12345'
       },
-      website: 'https://testhotel.com',
-      rating: 4.5,
+      rating: {
+        average: 4.5,
+        count: 10
+      },
       status: 'active',
-      images: ['hotel1.jpg', 'hotel2.jpg']
+      images: [
+        {
+          url: 'hotel1.jpg',
+          alt: 'Hotel exterior',
+          isPrimary: true
+        },
+        {
+          url: 'hotel2.jpg',
+          alt: 'Hotel lobby'
+        }
+      ]
     });
     await testProvider.save();
 
@@ -98,9 +115,28 @@ describe('Provider Controller', () => {
     testJourney = new Journey({
       name: 'Test Journey',
       description: 'A test journey',
-      price: 100.00,
-      duration: '2 days',
-      category: 'culture',
+      category: 'cultural',
+      type: 'guided',
+      duration: {
+        days: 2,
+        nights: 1
+      },
+      destinations: [{
+        name: 'Test City',
+        country: 'Test Country',
+        city: 'Test City'
+      }],
+      pricing: {
+        basePrice: 100.00,
+        currency: 'USD'
+      },
+      capacity: {
+        maxParticipants: 10
+      },
+      schedule: {
+        startDate: new Date('2024-01-01'),
+        endDate: new Date('2024-01-03')
+      },
       status: 'active',
       providerId: testProvider._id
     });
@@ -213,7 +249,7 @@ describe('Provider Controller', () => {
   describe('getPublicProviderDetails', () => {
     it('should get public provider details', async () => {
       const res = await request(app)
-        .get(`/public/providers/${testProvider._id}`)
+        .get(`/providers/${testProvider._id}`)
         .expect(200);
 
       expect(res.body.provider).toBeDefined();
@@ -227,7 +263,7 @@ describe('Provider Controller', () => {
       await testProvider.save();
 
       await request(app)
-        .get(`/public/providers/${testProvider._id}`)
+        .get(`/providers/${testProvider._id}`)
         .expect(404);
     });
   });

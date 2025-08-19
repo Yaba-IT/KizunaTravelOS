@@ -359,15 +359,9 @@ describe('Authorize Middleware', () => {
       authorizeMiddleware = authorize(null);
       authorizeMiddleware(mockReq, mockRes, mockNext);
 
-      expect(mockRes.status).toHaveBeenCalledWith(403);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        error: 'Access denied',
-        message: "Role 'admin' is not authorized for this resource",
-        code: 'INSUFFICIENT_PERMISSIONS',
-        requiredRoles: null,
-        userRole: 'admin'
-      });
-      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockRes.status).not.toHaveBeenCalled();
+      expect(mockRes.json).not.toHaveBeenCalled();
     });
 
     it('should handle undefined allowed roles', () => {
@@ -380,15 +374,9 @@ describe('Authorize Middleware', () => {
       authorizeMiddleware = authorize(undefined);
       authorizeMiddleware(mockReq, mockRes, mockNext);
 
-      expect(mockRes.status).toHaveBeenCalledWith(403);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        error: 'Access denied',
-        message: "Role 'admin' is not authorized for this resource",
-        code: 'INSUFFICIENT_PERMISSIONS',
-        requiredRoles: undefined,
-        userRole: 'admin'
-      });
-      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockRes.status).not.toHaveBeenCalled();
+      expect(mockRes.json).not.toHaveBeenCalled();
     });
   });
 

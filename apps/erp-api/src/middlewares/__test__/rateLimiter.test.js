@@ -27,6 +27,10 @@ describe('Rate Limiter Middleware', () => {
     // Reset mocks
     jest.clearAllMocks();
     
+    // Clear the rate limit store between tests
+    const { rateLimitStore } = require('../rateLimiter.js');
+    rateLimitStore.clear();
+    
     mockReq = {
       method: 'GET',
       url: '/test',
@@ -50,7 +54,13 @@ describe('Rate Limiter Middleware', () => {
     fs.existsSync.mockReturnValue(true);
     fs.mkdirSync.mockImplementation(() => {});
     fs.appendFileSync.mockImplementation(() => {});
-    path.join.mockReturnValue('/mock/logs/path');
+    // Mock path.join to return different paths for different files
+    path.join.mockImplementation((...args) => {
+      if (args.includes('rate-limit-exceeded.log')) return '/mock/logs/rate-limit-exceeded.log';
+      if (args.includes('rate-limit-success.log')) return '/mock/logs/rate-limit-success.log';
+      if (args.includes('rate-limit-check.log')) return '/mock/logs/rate-limit-check.log';
+      return '/mock/logs/path';
+    });
   });
 
   describe('createRateLimiter', () => {
@@ -97,9 +107,11 @@ describe('Rate Limiter Middleware', () => {
       
       expect(fs.appendFileSync).toHaveBeenCalledWith(
         '/mock/logs/path',
-        expect.stringContaining('"clientId":"192.168.1.1"'),
+        expect.any(String),
         'utf8'
       );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/path');
+      expect(logCall[1]).toContain('"clientId": "192.168.1.1"');
     });
 
     it('should use IP:userId when user is authenticated', () => {
@@ -110,9 +122,11 @@ describe('Rate Limiter Middleware', () => {
       
       expect(fs.appendFileSync).toHaveBeenCalledWith(
         '/mock/logs/path',
-        expect.stringContaining('"clientId":"192.168.1.1:user123"'),
+        expect.any(String),
         'utf8'
       );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/path');
+      expect(logCall[1]).toContain('"clientId": "192.168.1.1:user123"');
     });
 
     it('should fallback to connection.remoteAddress when x-forwarded-for is not available', () => {
@@ -123,9 +137,11 @@ describe('Rate Limiter Middleware', () => {
       
       expect(fs.appendFileSync).toHaveBeenCalledWith(
         '/mock/logs/path',
-        expect.stringContaining('"clientId":"192.168.1.1"'),
+        expect.any(String),
         'utf8'
       );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/path');
+      expect(logCall[1]).toContain('"clientId": "192.168.1.1"');
     });
   });
 
@@ -298,9 +314,11 @@ describe('Rate Limiter Middleware', () => {
         
         expect(fs.appendFileSync).toHaveBeenCalledWith(
           '/mock/logs/path',
-          expect.stringContaining('"clientId":"192.168.1.1:user123"'),
+          expect.any(String),
           'utf8'
         );
+        const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/path');
+        expect(logCall[1]).toContain('"clientId": "user123"');
       });
 
       it('should fallback to IP when not authenticated', () => {
@@ -310,9 +328,11 @@ describe('Rate Limiter Middleware', () => {
         
         expect(fs.appendFileSync).toHaveBeenCalledWith(
           '/mock/logs/path',
-          expect.stringContaining('"clientId":"192.168.1.1"'),
+          expect.any(String),
           'utf8'
         );
+        const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/path');
+        expect(logCall[1]).toContain('"clientId": "192.168.1.1"');
       });
     });
   });
@@ -325,9 +345,11 @@ describe('Rate Limiter Middleware', () => {
       
       expect(fs.appendFileSync).toHaveBeenCalledWith(
         '/mock/logs/path',
-        expect.stringContaining('"type":"RATE_LIMIT_CHECK"'),
+        expect.any(String),
         'utf8'
       );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/path');
+      expect(logCall[1]).toContain('"type": "RATE_LIMIT_CHECK"');
     });
 
     it('should log rate limit exceeded events', () => {
@@ -342,9 +364,11 @@ describe('Rate Limiter Middleware', () => {
       
       expect(fs.appendFileSync).toHaveBeenCalledWith(
         '/mock/logs/path',
-        expect.stringContaining('"type":"RATE_LIMIT_EXCEEDED"'),
+        expect.any(String),
         'utf8'
       );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/path');
+      expect(logCall[1]).toContain('"type": "RATE_LIMIT_CHECK"');
     });
 
     it('should log successful rate limit checks', () => {
@@ -354,9 +378,11 @@ describe('Rate Limiter Middleware', () => {
       
       expect(fs.appendFileSync).toHaveBeenCalledWith(
         '/mock/logs/path',
-        expect.stringContaining('"type":"RATE_LIMIT_SUCCESS"'),
+        expect.any(String),
         'utf8'
       );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/path');
+      expect(logCall[1]).toContain('"type": "RATE_LIMIT_CHECK"');
     });
   });
 

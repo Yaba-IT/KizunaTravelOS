@@ -70,7 +70,15 @@ describe('Logger Middleware', () => {
     fs.existsSync.mockReturnValue(true);
     fs.mkdirSync.mockImplementation(() => {});
     fs.appendFileSync.mockImplementation(() => {});
-    path.join.mockReturnValue('/mock/logs/path');
+    // Mock path.join to return different paths for different files
+    path.join.mockImplementation((...args) => {
+      if (args.includes('requests.log')) return '/mock/logs/requests.log';
+      if (args.includes('responses.log')) return '/mock/logs/responses.log';
+      if (args.includes('errors.log')) return '/mock/logs/errors.log';
+      if (args.includes('performance.log')) return '/mock/logs/performance.log';
+      if (args.includes('security.log')) return '/mock/logs/security.log';
+      return '/mock/logs/path';
+    });
   });
 
   afterEach(() => {
@@ -90,25 +98,25 @@ describe('Logger Middleware', () => {
       expect(typeof mockReq.startTime).toBe('number');
       expect(mockNext).toHaveBeenCalled();
       expect(fs.appendFileSync).toHaveBeenCalledWith(
-        '/mock/logs/path',
-        expect.stringContaining('"type":"REQUEST"'),
+        '/mock/logs/requests.log',
+        expect.any(String),
         'utf8'
       );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/requests.log');
+      expect(logCall[1]).toContain('"type": "REQUEST"');
     });
 
     it('should capture request headers and body', () => {
       requestLogger(mockReq, mockRes, mockNext);
 
       expect(fs.appendFileSync).toHaveBeenCalledWith(
-        '/mock/logs/path',
-        expect.stringContaining('"user-agent":"Mozilla/5.0 (Test Browser)"'),
+        '/mock/logs/requests.log',
+        expect.any(String),
         'utf8'
       );
-      expect(fs.appendFileSync).toHaveBeenCalledWith(
-        '/mock/logs/path',
-        expect.stringContaining('"ip":"192.168.1.1"'),
-        'utf8'
-      );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/requests.log');
+      expect(logCall[1]).toContain('"user-agent": "Mozilla/5.0 (Test Browser)"');
+      expect(logCall[1]).toContain('"ip": "192.168.1.1"');
     });
 
     it('should redact authorization header', () => {
@@ -117,10 +125,12 @@ describe('Logger Middleware', () => {
       requestLogger(mockReq, mockRes, mockNext);
 
       expect(fs.appendFileSync).toHaveBeenCalledWith(
-        '/mock/logs/path',
-        expect.stringContaining('"authorization":"[REDACTED]"'),
+        '/mock/logs/requests.log',
+        expect.any(String),
         'utf8'
       );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/requests.log');
+      expect(logCall[1]).toContain('"authorization": "[REDACTED]"');
     });
   });
 
@@ -156,10 +166,12 @@ describe('Logger Middleware', () => {
       responseLogger(mockReq, mockRes, mockNext);
 
       expect(fs.appendFileSync).toHaveBeenCalledWith(
-        '/mock/logs/path',
-        expect.stringContaining('"duration":"150ms"'),
+        '/mock/logs/responses.log',
+        expect.any(String),
         'utf8'
       );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/responses.log');
+      expect(logCall[1]).toContain('"duration": "150ms"');
     });
   });
 
@@ -171,15 +183,13 @@ describe('Logger Middleware', () => {
       errorLogger(mockError, mockReq, mockRes, mockNext);
 
       expect(fs.appendFileSync).toHaveBeenCalledWith(
-        '/mock/logs/path',
-        expect.stringContaining('"type":"ERROR"'),
+        '/mock/logs/errors.log',
+        expect.any(String),
         'utf8'
       );
-      expect(fs.appendFileSync).toHaveBeenCalledWith(
-        '/mock/logs/path',
-        expect.stringContaining('"error":"Test error"'),
-        'utf8'
-      );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/errors.log');
+      expect(logCall[1]).toContain('"type": "ERROR"');
+      expect(logCall[1]).toContain('"message": "Test error"');
       expect(mockNext).toHaveBeenCalledWith(mockError);
     });
   });
@@ -217,10 +227,12 @@ describe('Logger Middleware', () => {
       // Wait for the timeout
       setTimeout(() => {
         expect(fs.appendFileSync).toHaveBeenCalledWith(
-          '/mock/logs/path',
-          expect.stringContaining('"type":"PERFORMANCE"'),
+          '/mock/logs/performance.log',
+          expect.any(String),
           'utf8'
         );
+        const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/performance.log');
+        expect(logCall[1]).toContain('"type": "PERFORMANCE"');
       }, 1200);
     });
   });
@@ -230,10 +242,12 @@ describe('Logger Middleware', () => {
       securityLogger(mockReq, mockRes, mockNext);
 
       expect(fs.appendFileSync).toHaveBeenCalledWith(
-        '/mock/logs/path',
-        expect.stringContaining('"type":"SECURITY"'),
+        '/mock/logs/security.log',
+        expect.any(String),
         'utf8'
       );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/security.log');
+      expect(logCall[1]).toContain('"type": "SECURITY"');
       expect(mockNext).toHaveBeenCalled();
     });
 
@@ -243,10 +257,12 @@ describe('Logger Middleware', () => {
       securityLogger(mockReq, mockRes, mockNext);
 
       expect(fs.appendFileSync).toHaveBeenCalledWith(
-        '/mock/logs/path',
-        expect.stringContaining('"suspicious":true'),
+        '/mock/logs/security.log',
+        expect.any(String),
         'utf8'
       );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/security.log');
+      expect(logCall[1]).toContain('"suspicious": true');
     });
 
     it('should detect XSS attempts', () => {
@@ -255,10 +271,12 @@ describe('Logger Middleware', () => {
       securityLogger(mockReq, mockRes, mockNext);
 
       expect(fs.appendFileSync).toHaveBeenCalledWith(
-        '/mock/logs/path',
-        expect.stringContaining('"suspicious":true'),
+        '/mock/logs/security.log',
+        expect.any(String),
         'utf8'
       );
+      const logCall = fs.appendFileSync.mock.calls.find(call => call[0] === '/mock/logs/security.log');
+      expect(logCall[1]).toContain('"suspicious": true');
     });
   });
 
