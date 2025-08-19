@@ -676,3 +676,24 @@ exports.getBookingStats = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+/**
+ * @route   GET /api/admin/export/bookings
+ * @desc    Export bookings data (Admin only)
+ * @access  Private/Admin
+ */
+exports.exportBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find({ 'meta.isDeleted': false })
+      .populate('customerId', 'email firstname lastname')
+      .populate('journeyId', 'name category')
+      .populate('guideId', 'firstname lastname')
+      .sort({ 'meta.created_at': -1 });
+
+    res.json({ bookings });
+
+  } catch (error) {
+    console.error('Export bookings error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
