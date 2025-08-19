@@ -252,6 +252,81 @@ exports.restoreProfile = async (req, res) => {
 };
 
 /**
+ * @route   DELETE /api/profiles/:id
+ * @desc    Delete profile (Admin only)
+ * @access  Private/Admin
+ */
+exports.deleteProfile = async (req, res) => {
+  try {
+    const profile = await Profile.findById(req.params.id);
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    if (profile.meta.isDeleted) {
+      return res.status(400).json({ error: 'Profile is already deleted' });
+    }
+
+    // Soft delete profile
+    profile.meta.delete(req.user.id);
+    await profile.save();
+
+    // Soft delete associated user if it exists
+    const user = await User.findOne({ profileId: profile._id });
+    if (user) {
+      user.meta.delete(req.user.id);
+      await user.save();
+    }
+
+    res.json({
+      message: 'Profile deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * @route   PUT /api/guide/availability
+ * @desc    Update guide availability (Guide only)
+ * @access  Private/Guide
+ */
+exports.updateAvailability = async (req, res) => {
+  try {
+    const { availability } = req.body;
+
+    if (!availability) {
+      return res.status(400).json({ error: 'Availability data is required' });
+    }
+
+    const profile = await Profile.findOne({
+      userId: req.user.id,
+      'meta.isDeleted': false
+    });
+
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    // Update availability
+    profile.availability = availability;
+    profile.meta.updated_by = req.user.id;
+    await profile.save();
+
+    res.json({
+      message: 'Availability updated successfully',
+      profile: profile
+    });
+
+  } catch (error) {
+    console.error('Update availability error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
  * @route   GET /api/profiles/stats
  * @desc    Get profile statistics (Admin only)
  * @access  Private/Admin
