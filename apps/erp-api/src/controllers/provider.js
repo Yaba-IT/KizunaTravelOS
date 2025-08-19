@@ -130,14 +130,14 @@ exports.getPublicProviders = async (req, res) => {
 };
 
 /**
- * @route   GET /api/public/providers/:id
+ * @route   GET /api/public/providers/:providerId
  * @desc    Get public provider details
  * @access  Public
  */
 exports.getPublicProviderDetails = async (req, res) => {
   try {
     const provider = await Provider.findOne({
-      _id: req.params.id,
+      _id: req.params.providerId,
       'meta.isDeleted': false,
       status: 'active'
     }).select('name type description rating address images contact website');
