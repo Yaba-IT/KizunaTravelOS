@@ -132,6 +132,54 @@ exports.getAvailableJourneys = async (req, res) => {
 };
 
 /**
+ * @route   GET /api/public/journeys
+ * @desc    Get public journeys (no auth required)
+ * @access  Public
+ */
+exports.getPublicJourneys = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, category, minPrice, maxPrice, duration } = req.query;
+    const skip = (page - 1) * limit;
+
+    // Build query for public journeys
+    const query = { 
+      'meta.isDeleted': false,
+      status: 'active'
+    };
+    
+    if (category) query.category = category;
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = parseFloat(minPrice);
+      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+    }
+    if (duration) query.duration = duration;
+
+    const journeys = await Journey.find(query)
+      .select('name description price duration category images')
+      .skip(skip)
+      .limit(parseInt(limit))
+      .sort({ 'meta.created_at': -1 });
+
+    const total = await Journey.countDocuments(query);
+
+    res.json({
+      journeys,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Get public journeys error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
  * @route   GET /api/customer/journeys/:id
  * @desc    Get journey details for customers
  * @access  Private/Customer
@@ -812,6 +860,25 @@ exports.getJourneyStats = async (req, res) => {
 
   } catch (error) {
     console.error('Get journey stats error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * @route   GET /api/admin/export/journeys
+ * @desc    Export journeys data (Admin only)
+ * @access  Private/Admin
+ */
+exports.exportJourneys = async (req, res) => {
+  try {
+    const journeys = await Journey.find({ 'meta.isDeleted': false })
+      .populate('guideId', 'firstname lastname email')
+      .sort({ 'meta.created_at': -1 });
+
+    res.json({ journeys });
+
+  } catch (error) {
+    console.error('Export journeys error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
