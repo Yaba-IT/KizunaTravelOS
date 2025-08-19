@@ -98,7 +98,6 @@ userSchema.virtual('fullName').get(function() {
 });
 
 // Indexes for better query performance
-userSchema.index({ email: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ status: 1 });
 userSchema.index({ profileId: 1 });
