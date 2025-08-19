@@ -1,46 +1,58 @@
 /* Yaba-IT/KizunaTravelOS
-*
-* apps/erp-api/src/routes/agent.js - Agent routes for customer and booking management
-* Enables agents to manage customers and bookings
-*
-* coded by farid212@Yaba-IT!
-*/
+ * apps/erp-api/src/routes/agent.js
+ *
+ * coded by farid212@Yaba-IT!
+ */
 
 const express = require('express');
 const auth = require('../middlewares/auth.js');
 const authorize = require('../middlewares/authorize.js');
-const canAccessOwnData = require('../middlewares/canAccessOwnData.js');
-const router = express.Router();
 
-// Import controllers
+// Controllers
 const userCtrl = require('../controllers/user.js');
-const profileCtrl = require('../controllers/profile.js');
 const bookingCtrl = require('../controllers/booking.js');
 const journeyCtrl = require('../controllers/journey.js');
 const providerCtrl = require('../controllers/provider.js');
 
-// Agent customer management
-router.get('/customers', auth, authorize(['agent']), userCtrl.getCustomers);
-router.get('/customers/:customerId', auth, authorize(['agent']), userCtrl.getCustomerById);
-router.put('/customers/:customerId', auth, authorize(['agent']), userCtrl.updateCustomer);
-router.post('/customers/:customerId/status', auth, authorize(['agent']), userCtrl.updateCustomerStatus);
+const router = express.Router();
 
-// Agent booking management
-router.get('/bookings', auth, authorize(['agent']), bookingCtrl.getAllBookings);
-router.get('/bookings/:bookingId', auth, authorize(['agent']), bookingCtrl.getBookingById);
-router.put('/bookings/:bookingId', auth, authorize(['agent']), bookingCtrl.updateBooking);
-router.post('/bookings/:bookingId/status', auth, authorize(['agent']), bookingCtrl.updateBookingStatus);
-router.post('/bookings', auth, authorize(['agent']), bookingCtrl.createBookingForCustomer);
+// util: catcher async
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-// Agent journey management
-router.get('/journeys', auth, authorize(['agent']), journeyCtrl.getAllJourneys);
-router.get('/journeys/:journeyId', auth, authorize(['agent']), journeyCtrl.getJourneyById);
-router.put('/journeys/:journeyId', auth, authorize(['agent']), journeyCtrl.updateJourney);
-router.post('/journeys/:journeyId/assign-guide', auth, authorize(['agent']), journeyCtrl.assignGuide);
+// util: garde d'ID (ObjectId-like 24 hex)
+const isHex24 = (v) => /^[a-fA-F0-9]{24}$/.test(v);
+const guardId = (name) => (req, res, next) => {
+  const val = req.params[name];
+  if (val && !isHex24(val)) return res.status(400).json({ error: 'invalid_id', param: name });
+  next();
+};
 
-// Agent provider management
-router.get('/providers', auth, authorize(['agent']), providerCtrl.getAllProviders);
-router.get('/providers/:providerId', auth, authorize(['agent']), providerCtrl.getProviderById);
-router.put('/providers/:providerId', auth, authorize(['agent']), providerCtrl.updateProvider);
+// protection globale
+router.use(auth);
+router.use(authorize(['agent']));
+
+// Customers
+router.get('/customers', wrap(userCtrl.getCustomers));
+router.get('/customers/:customerId', guardId('customerId'), wrap(userCtrl.getCustomerById));
+router.put('/customers/:customerId', guardId('customerId'), wrap(userCtrl.updateCustomer));
+router.post('/customers/:customerId/status', guardId('customerId'), wrap(userCtrl.updateCustomerStatus));
+
+// Bookings
+router.get('/bookings', wrap(bookingCtrl.getAllBookings));
+router.get('/bookings/:bookingId', guardId('bookingId'), wrap(bookingCtrl.getBookingById));
+router.put('/bookings/:bookingId', guardId('bookingId'), wrap(bookingCtrl.updateBooking));
+router.post('/bookings/:bookingId/status', guardId('bookingId'), wrap(bookingCtrl.updateBookingStatus));
+router.post('/bookings', wrap(bookingCtrl.createBookingForCustomer));
+
+// Journeys
+router.get('/journeys', wrap(journeyCtrl.getAllJourneys));
+router.get('/journeys/:journeyId', guardId('journeyId'), wrap(journeyCtrl.getJourneyById));
+router.put('/journeys/:journeyId', guardId('journeyId'), wrap(journeyCtrl.updateJourney));
+router.post('/journeys/:journeyId/assign-guide', guardId('journeyId'), wrap(journeyCtrl.assignGuide));
+
+// Providers
+router.get('/providers', wrap(providerCtrl.getAllProviders));
+router.get('/providers/:providerId', guardId('providerId'), wrap(providerCtrl.getProviderById));
+router.put('/providers/:providerId', guardId('providerId'), wrap(providerCtrl.updateProvider));
 
 module.exports = router;
