@@ -5,14 +5,12 @@
 *
 * coded by farid212@Yaba-IT!
 */
-
-require('dotenv').config();
 const mongoose = require('mongoose');
 
-const { MONGO_URI } = process.env;
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI || process.env.VITE_MONGO_URI;
 
-if (!MONGO_URI) {
-  console.error('Error: MONGO_URI environment variable is not set.');
+if (!MONGODB_URI) {
+  console.error('Error: MONGODB_URI (or MONGO_URI) environment variable is not set.');
   process.exit(1);
 }
 
@@ -23,7 +21,7 @@ mongoose.connection
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(MONGO_URI);
+    await mongoose.connect(MONGODB_URI);
   } catch (err) {
     console.error(`MongoDB connection failed: ${err}`);
     process.exit(1);
