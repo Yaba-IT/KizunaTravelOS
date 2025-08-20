@@ -5,7 +5,7 @@ FROM node:20-slim AS development
 WORKDIR /app
 
 # Dependencies for Vite + React Fast-Refresh
-COPY package*.json ./
+COPY package*.json yarn.lock ./
 RUN yarn install
 
 COPY . .
@@ -19,10 +19,8 @@ CMD ["yarn", "dev", "--host"]
 FROM node:20-slim AS build
 WORKDIR /app
 
-COPY package*.json ./
-RUN yarn install --production
-
 COPY . .
+RUN yarn install
 RUN yarn build 
 
 ###############################################################################

@@ -14,7 +14,7 @@ const router = express.Router();
 
 // Import controllers
 const userCtrl = require('../controllers/user.js');
-const profileCtrl = require('../controllers/profile.js');
+// const profileCtrl = require('../controllers/profile.js');
 const bookingCtrl = require('../controllers/booking.js');
 const journeyCtrl = require('../controllers/journey.js');
 

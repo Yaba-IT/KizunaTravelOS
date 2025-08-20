@@ -72,8 +72,8 @@ const createRateLimiter = (options = {}) => {
     max = 100, // max requests per window
     message = 'Too many requests from this IP, please try again later.',
     statusCode = 429,
-    skipSuccessfulRequests = false,
-    skipFailedRequests = false,
+    // skipSuccessfulRequests = false,
+    // skipFailedRequests = false,
     keyGenerator = getClientIdentifier,
     handler = null,
     onLimitReached = null,

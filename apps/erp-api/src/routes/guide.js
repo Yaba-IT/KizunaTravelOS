@@ -9,11 +9,11 @@
 const express = require('express');
 const auth = require('../middlewares/auth.js');
 const authorize = require('../middlewares/authorize.js');
-const canAccessOwnData = require('../middlewares/canAccessOwnData.js');
+// const canAccessOwnData = require('../middlewares/canAccessOwnData.js');
 const router = express.Router();
 
 // Import controllers
-const userCtrl = require('../controllers/user.js');
+// const userCtrl = require('../controllers/user.js');
 const profileCtrl = require('../controllers/profile.js');
 const journeyCtrl = require('../controllers/journey.js');
 const bookingCtrl = require('../controllers/booking.js');

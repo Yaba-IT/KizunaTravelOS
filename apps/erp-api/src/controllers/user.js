@@ -8,7 +8,7 @@
 
 const User = require('../models/User');
 const Profile = require('../models/Profile');
-const bcrypt = require('bcryptjs');
+// const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 

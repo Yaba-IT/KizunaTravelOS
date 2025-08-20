@@ -28,8 +28,8 @@ const Sentry = require('@sentry/node');
 const { ProfilingIntegration } = require('@sentry/profiling-node');
 const connectDB = require('./configs/db.js');
 const { applyAllLogging } = require('./middlewares/logger.js');
-const { rateLimiters } = require('./middlewares/rateLimiter.js');
-const { validationMiddleware } = require('./middlewares/validation.js');
+// const { rateLimiters } = require('./middlewares/rateLimiter.js');
+// const { validationMiddleware } = require('./middlewares/validation.js');
 const config = require('./configs/config.js');
 
 // Initialize Sentry for error tracking and performance monitoring
@@ -280,7 +280,7 @@ app.use(express.json({
   verify: (req, res, buf) => {
     try {
       JSON.parse(buf);
-    } catch (e) {
+    } catch {
       throw new Error('Invalid JSON');
     }
   }
@@ -415,7 +415,7 @@ app.use(morgan(morganFormat, {
       logger.info(sanitizedMessage.trim());
     }
   },
-  skip: (req, res) => {
+  skip: (req, _res) => {
     // Skip logging health checks and static assets
     return req.url === '/health' || req.url.startsWith('/static');
   }
@@ -493,7 +493,7 @@ app.delete('/gdpr/data-deletion/:userId', (req, res) => {
 });
 
 // Global error handling middleware with Sentry integration
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   // Log error with comprehensive context
   const errorData = {
     type: 'GLOBAL_ERROR',

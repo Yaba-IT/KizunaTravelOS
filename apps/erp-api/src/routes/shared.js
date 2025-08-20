@@ -8,7 +8,7 @@
 
 const express = require('express');
 const auth = require('../middlewares/auth.js');
-const authorize = require('../middlewares/authorize.js');
+// const authorize = require('../middlewares/authorize.js');
 const canAccessOwnData = require('../middlewares/canAccessOwnData.js');
 const router = express.Router();
 

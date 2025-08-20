@@ -146,18 +146,15 @@ router.get('/health', async (req, res) => {
       // Check database connection
       const mongoose = require('mongoose');
       healthCheck.services.database = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-    } catch (error) {
+    } catch {
       healthCheck.services.database = 'error';
     }
   
     try {
-      // Check Redis connection
-      if (redisClient && redisClient.connected) {
-        healthCheck.services.redis = 'connected';
-      } else {
-        healthCheck.services.redis = 'disconnected';
-      }
-    } catch (error) {
+      // Check Redis connection (would need to import redisClient if available)
+      // TODO: Import redisClient to enable this check
+      healthCheck.services.redis = 'not_implemented';
+    } catch {
       healthCheck.services.redis = 'error';
     }
   
@@ -171,7 +168,7 @@ router.get('/health', async (req, res) => {
         external: Math.round(memUsage.external / 1024 / 1024)
       };
       healthCheck.services.memory = memUsageMB;
-    } catch (error) {
+    } catch {
       healthCheck.services.memory = 'error';
     }
   

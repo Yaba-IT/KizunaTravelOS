@@ -49,7 +49,7 @@
     "validate": "node scripts/startup.js",
     "setup": "node scripts/setup-env.js",
     "check-version": "node scripts/check-version.js",
-    "lint": "eslint src/**",
+    "lint": "eslint 'src/**/*.js'",
     "test": "MONGODB_URI_TEST='mongodb://127.0.0.1:27017/kizuna_travel_os_test' jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

@@ -80,8 +80,7 @@ module.exports = {
     // Connection pool settings
     maxRetriesPerRequest: parseInt(process.env.REDIS_MAX_RETRIES) || 3,
     retryDelayOnFailover: parseInt(process.env.REDIS_RETRY_DELAY) || 100,
-    enableReadyCheck: true,
-    maxRetriesPerRequest: 3
+    enableReadyCheck: true
   },
   
   // Logging Configuration
