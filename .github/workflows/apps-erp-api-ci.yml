@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - dev
+      - master
     paths:
       - 'apps/erp-api/**'
       - '.github/workflows/apps-erp-api-ci.yml'
@@ -33,36 +34,41 @@ jobs:
       - name: Get changed files
         id: get-changed-files
         run: |
-          # Get the base commit (dev branch)
-          BASE_COMMIT=$(git rev-parse origin/dev)
+          # Get the base commit based on target branch
+          if [ "${{ github.base_ref }}" = "master" ]; then
+            BASE_COMMIT=$(git rev-parse origin/master)
+          else
+            BASE_COMMIT=$(git rev-parse origin/dev)
+          fi
           
-          # Get changed files between PR and dev
+          # Get changed files between PR and target branch
           CHANGED_FILES=$(git diff --name-only $BASE_COMMIT HEAD)
           echo "Changed files:"
           echo "$CHANGED_FILES"
           
-          # Filter for ERP API related files
-          ERP_API_FILES=$(echo "$CHANGED_FILES" | grep -E "^(apps/erp-api/|compose/)" || true)
+          # Filter for ERP API related files ONLY (not compose or other files)
+          ERP_API_FILES=$(echo "$CHANGED_FILES" | grep -E "^apps/erp-api/" || true)
           
-          # Check if there are ERP API changes
+          # Check if there are actual ERP API changes
           if [ -n "$ERP_API_FILES" ]; then
             echo "has_erp_api_changes=true" >> $GITHUB_OUTPUT
             echo "ERP API changed files:"
             echo "$ERP_API_FILES"
           else
             echo "has_erp_api_changes=false" >> $GITHUB_OUTPUT
+            echo "No ERP API application changes detected"
           fi
           
           echo "all_changed_files<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-  # Main ERP API testing and validation job
-  erp-api-ci:
-    name: ERP‑API Tests & Build
+  # Main ERP API testing and validation job (for dev branch)
+  erp-api-ci-dev:
+    name: ERP‑API Tests & Build (Dev)
     runs-on: ubuntu-latest
     needs: get-changed-files
-    if: needs.get-changed-files.outputs.has-erp-api-changes == 'true'
+    if: needs.get-changed-files.outputs.has-erp-api-changes == 'true' && github.base_ref == 'dev'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -212,6 +218,71 @@ jobs:
         if: failure()
         run: |
           echo "Creating failure issue for ERP API CI..."
+          echo "PR: ${{ github.event.pull_request.number }}"
+          echo "Branch: ${{ github.head_ref }} → ${{ github.base_ref }}"
+          echo "Commit: ${{ github.sha }}"
+        continue-on-error: true
+
+  # Docker Compose only job (for master branch)
+  erp-api-compose-master:
+    name: ERP API Docker Compose (Master)
+    runs-on: ubuntu-latest
+    needs: get-changed-files
+    if: needs.get-changed-files.outputs.has-erp-api-changes == 'true' && github.base_ref == 'master'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test Docker Compose
+        id: test-compose
+        run: |
+          echo "Testing Docker Compose for master branch..."
+          
+          # Start services in background
+          docker-compose -f compose/compose.base.yml -f compose/compose.dev.yml up -d mongo postgres rabbitmq
+          
+          # Wait for services to be ready
+          sleep 10
+          
+          # Test ERP API service
+          docker-compose -f compose/compose.base.yml -f compose/compose.dev.yml run --rm erp-api echo "ERP API service test passed"
+          
+          if [ $? -eq 0 ]; then
+            echo "compose_status=passed" >> $GITHUB_OUTPUT
+          else
+            echo "compose_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          # Cleanup
+          docker-compose -f compose/compose.base.yml -f compose/compose.dev.yml down
+
+      - name: Auto-merge PR
+        id: auto-merge
+        if: steps.test-compose.outputs.compose_status == 'passed'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                merge_method: 'squash'
+              });
+              console.log('PR auto-merged successfully');
+              return 'merged';
+            } catch (error) {
+              console.log('Auto-merge failed:', error.message);
+              return 'failed';
+            }
+
+      - name: Create failure issue
+        if: failure()
+        run: |
+          echo "Creating failure issue for ERP API Docker Compose..."
           echo "PR: ${{ github.event.pull_request.number }}"
           echo "Branch: ${{ github.head_ref }} → ${{ github.base_ref }}"
           echo "Commit: ${{ github.sha }}"
