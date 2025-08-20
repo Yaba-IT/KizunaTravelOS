@@ -14,6 +14,7 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  id-token: write
 
 jobs:
   # Job to get changed files and determine what to test
@@ -282,9 +283,15 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '✅ No ERP API changes detected in this PR. CI checks skipped.'
-            });
+            try {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '✅ No ERP API changes detected in this PR. CI checks skipped.'
+              });
+              console.log('Comment added successfully');
+            } catch (error) {
+              console.log('Could not add comment to PR:', error.message);
+              // Continue without failing the workflow
+            }
