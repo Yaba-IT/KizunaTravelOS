@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="23" failures="0" errors="0" time="1.524">
+  <testsuite name="SectionWrapper Component" errors="0" failures="0" skipped="0" timestamp="2025-08-20T20:32:51" time="0.84" tests="7">
+    <testcase classname="SectionWrapper Component renders children content" name="SectionWrapper Component renders children content" time="0.021">
+    </testcase>
+    <testcase classname="SectionWrapper Component wraps content in container by default" name="SectionWrapper Component wraps content in container by default" time="0.004">
+    </testcase>
+    <testcase classname="SectionWrapper Component does not wrap content in container when useContainer is false" name="SectionWrapper Component does not wrap content in container when useContainer is false" time="0.003">
+    </testcase>
+    <testcase classname="SectionWrapper Component applies custom maxWidth when useContainer is true" name="SectionWrapper Component applies custom maxWidth when useContainer is true" time="0.004">
+    </testcase>
+    <testcase classname="SectionWrapper Component applies custom sx styles" name="SectionWrapper Component applies custom sx styles" time="0.004">
+    </testcase>
+    <testcase classname="SectionWrapper Component passes through additional props" name="SectionWrapper Component passes through additional props" time="0.003">
+    </testcase>
+    <testcase classname="SectionWrapper Component works with complex children" name="SectionWrapper Component works with complex children" time="0.004">
+    </testcase>
+  </testsuite>
+  <testsuite name="Section Component" errors="0" failures="0" skipped="0" timestamp="2025-08-20T20:32:51" time="0.849" tests="9">
+    <testcase classname="Section Component renders section with id" name="Section Component renders section with id" time="0.022">
+    </testcase>
+    <testcase classname="Section Component renders section with title" name="Section Component renders section with title" time="0.009">
+    </testcase>
+    <testcase classname="Section Component renders children content" name="Section Component renders children content" time="0.004">
+    </testcase>
+    <testcase classname="Section Component renders without title when not provided" name="Section Component renders without title when not provided" time="0.003">
+    </testcase>
+    <testcase classname="Section Component applies custom spacing" name="Section Component applies custom spacing" time="0.002">
+    </testcase>
+    <testcase classname="Section Component applies custom title alignment" name="Section Component applies custom title alignment" time="0.004">
+    </testcase>
+    <testcase classname="Section Component applies custom title variant" name="Section Component applies custom title variant" time="0.004">
+    </testcase>
+    <testcase classname="Section Component applies custom maxWidth to container" name="Section Component applies custom maxWidth to container" time="0.002">
+    </testcase>
+    <testcase classname="Section Component applies custom sx styles" name="Section Component applies custom sx styles" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="Navbar Component" errors="0" failures="0" skipped="0" timestamp="2025-08-20T20:32:51" time="1.117" tests="7">
+    <testcase classname="Navbar Component renders the navbar with title" name="Navbar Component renders the navbar with title" time="0.1">
+    </testcase>
+    <testcase classname="Navbar Component renders navigation items on desktop" name="Navbar Component renders navigation items on desktop" time="0.025">
+    </testcase>
+    <testcase classname="Navbar Component renders scroll links for each nav item" name="Navbar Component renders scroll links for each nav item" time="0.019">
+    </testcase>
+    <testcase classname="Navbar Component renders mobile menu button" name="Navbar Component renders mobile menu button" time="0.017">
+    </testcase>
+    <testcase classname="Navbar Component opens mobile drawer when menu button is clicked" name="Navbar Component opens mobile drawer when menu button is clicked" time="0.039">
+    </testcase>
+    <testcase classname="Navbar Component renders with empty nav items" name="Navbar Component renders with empty nav items" time="0.01">
+    </testcase>
+    <testcase classname="Navbar Component closes mobile drawer when nav item is clicked" name="Navbar Component closes mobile drawer when nav item is clicked" time="0.042">
+    </testcase>
+  </testsuite>
+</testsuites>
