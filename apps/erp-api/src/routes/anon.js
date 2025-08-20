@@ -16,15 +16,9 @@ const journeyCtrl = require('../controllers/journey.js');
 const providerCtrl = require('../controllers/provider.js');
 
 // util: wrap async
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-
+const wrap = require('../utils/wrap.js');
 // util: valider un ObjectId 24 hex
-const isHex24 = (v) => /^[a-fA-F0-9]{24}$/.test(v);
-const paramId = (name) => (req, res, next) => {
-  const id = req.params[name];
-  if (id && !isHex24(id)) return res.status(400).json({ error: 'invalid_id', param: name });
-  next();
-};
+const guardId = require('../utils/guardId.js');
 const config = require('../configs/config.js');
 
 // ========================================
@@ -96,7 +90,7 @@ router.get('/journeys/search', wrap(journeyCtrl.searchPublicJourneys));
  * @desc    Get public journey details
  * @access  Public
  */
-router.get('/journeys/:journeyId', paramId('journeyId'), wrap(journeyCtrl.getPublicJourneyDetails));
+router.get('/journeys/:journeyId', guardId('journeyId'), wrap(journeyCtrl.getPublicJourneyDetails));
 
 /**
  * @route   GET /providers
@@ -110,7 +104,7 @@ router.get('/providers', wrap(providerCtrl.getPublicProviders));
  * @desc    Get public provider details
  * @access  Public
  */
-router.get('/providers/:providerId', paramId('providerId'), wrap(providerCtrl.getPublicProviderDetails));
+router.get('/providers/:providerId', guardId('providerId'), wrap(providerCtrl.getPublicProviderDetails));
 
 // ========================================
 // SYSTEM ROUTES
