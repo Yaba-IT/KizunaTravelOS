@@ -92,19 +92,6 @@ router.get('/journeys/search', wrap(journeyCtrl.searchPublicJourneys));
  */
 router.get('/journeys/:journeyId', guardId('journeyId'), wrap(journeyCtrl.getPublicJourneyDetails));
 
-/**
- * @route   GET /providers
- * @desc    Get public provider information
- * @access  Public
- */
-router.get('/providers', wrap(providerCtrl.getPublicProviders));
-
-/**
- * @route   GET /providers/:providerId
- * @desc    Get public provider details
- * @access  Public
- */
-router.get('/providers/:providerId', guardId('providerId'), wrap(providerCtrl.getPublicProviderDetails));
 
 // ========================================
 // SYSTEM ROUTES
