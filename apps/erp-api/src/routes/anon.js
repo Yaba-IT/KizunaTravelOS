@@ -13,7 +13,6 @@ const router = express.Router();
 // Controllers
 const userCtrl = require('../controllers/user.js');
 const journeyCtrl = require('../controllers/journey.js');
-const providerCtrl = require('../controllers/provider.js');
 
 // util: wrap async
 const wrap = require('../utils/wrap.js');
