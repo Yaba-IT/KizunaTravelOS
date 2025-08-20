@@ -91,7 +91,6 @@ router.get('/journeys/search', wrap(journeyCtrl.searchPublicJourneys));
  */
 router.get('/journeys/:journeyId', guardId('journeyId'), wrap(journeyCtrl.getPublicJourneyDetails));
 
-
 // ========================================
 // SYSTEM ROUTES
 // ========================================
