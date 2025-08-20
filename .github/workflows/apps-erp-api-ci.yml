@@ -218,22 +218,15 @@ jobs:
               pull_number: context.issue.number
             });
             
-            const testStatus = '${{ steps.run-tests.outputs.test_status || steps.run-all-tests.outputs.test_status }}';
-            const dockerStatus = '${{ steps.build-docker.outputs.docker_status }}';
-            const composeStatus = '${{ steps.test-compose.outputs.compose_status }}';
-            
+            // Get the job context to determine which step failed
+            const jobName = context.job;
             let failureDetails = '';
             let failureLocation = '';
             
-            if (testStatus === 'failed') {
-              failureDetails = 'Unit tests failed for changed files';
-              failureLocation = 'Test execution';
-            } else if (dockerStatus === 'failed') {
-              failureDetails = 'Docker build failed';
-              failureLocation = 'Docker build';
-            } else if (composeStatus === 'failed') {
-              failureDetails = 'Docker Compose validation failed';
-              failureLocation = 'Docker Compose';
+            // Determine failure location based on job context
+            if (jobName === 'erp-api-ci') {
+              failureDetails = 'Pipeline failed during ERP API CI execution';
+              failureLocation = 'ERP API CI Pipeline';
             } else {
               failureDetails = 'Unknown failure occurred';
               failureLocation = 'Unknown';
@@ -256,11 +249,6 @@ jobs:
               '```',
               '${{ needs.get-changed-files.outputs.changed-files }}',
               '```',
-              '',
-              '### Test Status',
-              `- Unit Tests: ${testStatus || 'not run'}`,
-              `- Docker Build: ${dockerStatus || 'not run'}`,
-              `- Docker Compose: ${composeStatus || 'not run'}`,
               '',
               '### Next Steps',
               'Please review the failure and fix the issues before resubmitting the PR.',
