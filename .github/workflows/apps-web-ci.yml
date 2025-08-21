@@ -2,195 +2,160 @@ name: WEB CI
 
 on:
   pull_request:
-    branches:
-      - dev
-      - master
+    branches: [dev, master]
     paths:
-      - 'apps/web/**'
-      - '.github/workflows/apps-web-ci.yml'
-      - 'compose/**'
-      - 'package.json'
+      - "apps/web/**"
+      - ".github/workflows/apps-web-ci.yml"
+      - "compose/**"
+      - "package.json"
 
-# Use minimal permissions by default, grant specific permissions only when needed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# Default to read-only. Elevate per job only.
 permissions:
   contents: read
   pull-requests: read
   issues: read
 
+env:
+  CI: true
+
 jobs:
-  # Job to get changed files and determine what to test
-  get-changed-files:
-    name: Get Changed Files
+  paths-filter:
+    name: Detect changes
     runs-on: ubuntu-latest
     outputs:
-      changed-files: ${{ steps.get-changed-files.outputs.all_changed_files }}
-      has-web-changes: ${{ steps.get-changed-files.outputs.has_web_changes }}
+      web_changed: ${{ steps.filter.outputs.web }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - id: filter
+        uses: dorny/paths-filter@v3
         with:
-          fetch-depth: 0
-      
-      - name: Get changed files
-        id: get-changed-files
-        run: |
-          # Get the base commit based on target branch
-          if [ "${{ github.base_ref }}" = "master" ]; then
-            BASE_COMMIT=$(git rev-parse origin/master)
-          else
-            BASE_COMMIT=$(git rev-parse origin/dev)
-          fi
-          
-          # Get changed files between PR and target branch
-          CHANGED_FILES=$(git diff --name-only $BASE_COMMIT HEAD)
-          echo "Changed files:"
-          echo "$CHANGED_FILES"
-          
-          # Filter for Web related files ONLY (not compose or other files)
-          WEB_FILES=$(echo "$CHANGED_FILES" | grep -E "^apps/web/" || true)
-          
-          # Check if there are actual Web application changes
-          if [ -n "$WEB_FILES" ]; then
-            echo "has_web_changes=true" >> $GITHUB_OUTPUT
-            echo "Web changed files:"
-            echo "$WEB_FILES"
-          else
-            echo "has_web_changes=false" >> $GITHUB_OUTPUT
-            echo "No Web application changes detected"
-          fi
-          
-          echo "all_changed_files<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          filters: |
+            web:
+              - 'apps/web/**'
 
-  # PR to dev: Test → Build Dockerfile
-  web-dev-pipeline:
-    name: WEB Dev Pipeline (Test → Build)
+  web-dev:
+    name: WEB Dev (lint → test → build)
+    needs: paths-filter
+    if: needs.paths-filter.outputs.web_changed == 'true' && github.base_ref == 'dev'
     runs-on: ubuntu-latest
-    needs: get-changed-files
-    if: needs.get-changed-files.outputs.has-web-changes == 'true' && github.base_ref == 'dev'
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'yarn'
+          cache: yarn
+          cache-dependency-path: yarn.lock
 
-      - name: Install dependencies
-        run: yarn workspace web install --frozen-lockfile
+      - name: Install deps (workspace-aware)
+        run: yarn install --frozen-lockfile
 
-      - name: Run linting
-        run: |
-          cd apps/web
-          yarn lint
+      - name: Lint
+        run: yarn workspace web lint
 
-      - name: Run tests
-        run: |
-          cd apps/web
-          yarn test
+      - name: Test
+        run: yarn workspace web test --ci
 
-      - name: Build Docker image
-        run: |
-          cd apps/web
-          docker build -t web:test .
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push) with cache
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/web
+          load: true
+          tags: web:test
+          cache-from: type=gha,scope=apps-web
+          cache-to: type=gha,mode=max,scope=apps-web
 
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
           script: |
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '✅ WEB Dev Pipeline: Tests passed and Docker image built successfully!'
+              issue_number: context.issue.number,
+              body: '✅ WEB Dev: lint, tests, and Docker build passed.'
             })
 
-  # PR to master: Docker Compose
-  web-master-pipeline:
-    name: WEB Master Pipeline (Docker Compose)
+  web-master:
+    name: WEB Master (compose smoke + auto-merge)
+    needs: paths-filter
+    if: needs.paths-filter.outputs.web_changed == 'true' && github.base_ref == 'master'
     runs-on: ubuntu-latest
-    needs: get-changed-files
-    if: needs.get-changed-files.outputs.has-web-changes == 'true' && github.base_ref == 'master'
+    timeout-minutes: 30
+    permissions:
+      contents: write        # needed to merge
+      pull-requests: write
+      issues: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
 
-      - name: Test Docker Compose
-        id: test-compose
+      - name: Compose up deps
         run: |
-          echo "Testing Docker Compose for master branch..."
-          
-          # Start services in background
+          set -euo pipefail
           docker compose -f compose/compose.base.yml -f compose/compose.dev.yml up -d mongo postgres rabbitmq
-          
-          # Wait for services to be ready
-          sleep 10
-          
-          # Test Web service
-          docker compose -f compose/compose.base.yml -f compose/compose.dev.yml run --rm web echo "Web service test passed"
-          
-          if [ $? -eq 0 ]; then
-            echo "compose_status=passed" >> $GITHUB_OUTPUT
-          else
-            echo "compose_status=failed" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-          
-          # Cleanup
-          docker compose -f compose/compose.base.yml -f compose/compose.dev.yml down
+          sleep 25  # replace with healthchecks when available
 
-      - name: Auto-merge PR
-        id: auto-merge
-        if: steps.test-compose.outputs.compose_status == 'passed'
+      - name: Compose smoke test
+        run: |
+          set -euo pipefail
+          docker compose -f compose/compose.base.yml -f compose/compose.dev.yml run --rm web node -v
+          STATUS=$?
+          docker compose -f compose/compose.base.yml -f compose/compose.dev.yml down -v
+          exit $STATUS
+
+      - name: Auto-merge PR (same-repo only)
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         uses: actions/github-script@v7
         with:
           script: |
-            try {
-              await github.rest.pulls.merge({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number,
-                merge_method: 'squash'
-              });
-              console.log('PR auto-merged successfully');
-              return 'merged';
-            } catch (error) {
-              console.log('Auto-merge failed:', error.message);
-              return 'failed';
-            }
-
-      - name: Comment on PR
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
+            await github.rest.pulls.merge({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '✅ WEB Master Pipeline: Docker Compose test passed! PR will be auto-merged.'
+              pull_number: context.issue.number,
+              merge_method: 'squash'
             })
 
-  # Job to handle PRs with no Web changes
-  no-changes:
-    name: No Web Changes
-    runs-on: ubuntu-latest
-    needs: get-changed-files
-    if: needs.get-changed-files.outputs.has-web-changes == 'false'
-    steps:
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
           script: |
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '⏭️ No Web changes detected. Skipping Web CI pipeline.'
+              issue_number: context.issue.number,
+              body: '✅ WEB Master: compose smoke test passed. Auto-merge attempted.'
+            })
+
+  no-changes:
+    name: No WEB changes
+    needs: paths-filter
+    if: needs.paths-filter.outputs.web_changed != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '⏭️ No WEB changes. Skipping WEB CI.'
             })
