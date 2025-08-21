@@ -7,27 +7,28 @@
 */
 
 const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 const User = require('../User.js');
 const Profile = require('../Profile.js');
 const Meta = require('../Meta.js');
 
 describe('User Model', () => {
+  let mongoServer;
+
   beforeAll(async () => {
-    // Connect to test database
-    const testDbUri = process.env.MONGODB_URI_TEST || process.env.MONGODB_URI;
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(testDbUri);
-    }
+    // Use in-memory database for testing
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    await mongoose.connect(mongoUri);
   });
 
   afterAll(async () => {
-    if (mongoose.connection.readyState === 1) {
-      await mongoose.connection.close();
-    }
+    await mongoose.disconnect();
+    await mongoServer.stop();
   });
 
   beforeEach(async () => {
-    // Clear all collections that might interfere with tests
+    // Clear all collections
     const collections = await mongoose.connection.db.listCollections().toArray();
     for (const collection of collections) {
       await mongoose.connection.db.collection(collection.name).deleteMany({});
@@ -435,39 +436,22 @@ describe('User Model', () => {
     });
 
     it('should find active users', async () => {
-      // Create profiles first
-      const profile1 = await Profile.create({
-        userId: new mongoose.Types.ObjectId(),
-        firstname: 'John',
-        lastname: 'Doe',
-        role: 'customer'
-      });
-
-      const profile2 = await Profile.create({
-        userId: new mongoose.Types.ObjectId(),
-        firstname: 'Jane',
-        lastname: 'Smith',
-        role: 'customer'
-      });
-
-      const user1 = new User({
+      // Create users with profiles using the test utility
+      const { createUserWithProfile } = require('../../test-utils/factories');
+      
+      await createUserWithProfile({
         email: 'test1@example.com',
         password: 'Password123!',
         role: 'customer',
-        profileId: profile1._id,
         status: 'active'
       });
 
-      const user2 = new User({
+      await createUserWithProfile({
         email: 'test2@example.com',
         password: 'Password123!',
         role: 'customer',
-        profileId: profile2._id,
         status: 'inactive'
       });
-
-      await user1.save();
-      await user2.save();
       
       const activeUsers = await User.findActive();
       // Find the user we created in this test
@@ -477,37 +461,20 @@ describe('User Model', () => {
     });
 
     it('should find non-deleted users', async () => {
-      const profile1 = new Profile({
-        userId: new mongoose.Types.ObjectId(),
-        firstname: 'John',
-        lastname: 'Doe',
-        role: 'customer'
-      });
-      await profile1.save();
-
-      const profile2 = new Profile({
-        userId: new mongoose.Types.ObjectId(),
-        firstname: 'Jane',
-        lastname: 'Doe',
-        role: 'customer'
-      });
-      await profile2.save();
-
-      const user1 = new User({
+      // Create users with profiles using the test utility
+      const { createUserWithProfile } = require('../../test-utils/factories');
+      
+      await createUserWithProfile({
         email: 'test1@example.com',
         password: 'Password123!',
-        role: 'customer',
-        profileId: profile1._id
+        role: 'customer'
       });
-      await user1.save();
 
-      const user2 = new User({
+      const { user: user2 } = await createUserWithProfile({
         email: 'test2@example.com',
         password: 'Password123!',
-        role: 'customer',
-        profileId: profile2._id
+        role: 'customer'
       });
-      await user2.save();
 
       // Soft delete one user
       user2.meta.isDeleted = true;

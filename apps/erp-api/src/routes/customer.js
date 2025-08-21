@@ -20,10 +20,10 @@ const journeyCtrl = require('../controllers/journey.js');
 
 // Customer booking management
 router.get('/bookings', auth, authorize(['customer']), bookingCtrl.getMyBookings);
-router.get('/bookings/:bookingId', auth, authorize(['customer']), canAccessOwnData, bookingCtrl.getMyBooking);
+router.get('/bookings/:bookingId', auth, authorize(['customer']), bookingCtrl.getMyBooking);
 router.post('/bookings', auth, authorize(['customer']), bookingCtrl.createBooking);
-router.put('/bookings/:bookingId', auth, authorize(['customer']), canAccessOwnData, bookingCtrl.updateMyBooking);
-router.delete('/bookings/:bookingId', auth, authorize(['customer']), canAccessOwnData, bookingCtrl.cancelMyBooking);
+router.put('/bookings/:bookingId', auth, authorize(['customer']), bookingCtrl.updateMyBooking);
+router.delete('/bookings/:bookingId', auth, authorize(['customer']), bookingCtrl.cancelMyBooking);
 
 // Customer journey browsing
 router.get('/journeys', auth, authorize(['customer']), journeyCtrl.getAvailableJourneys);

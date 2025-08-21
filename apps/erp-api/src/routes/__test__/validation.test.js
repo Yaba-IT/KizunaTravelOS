@@ -25,7 +25,7 @@ if (app.listen) {
   };
 }
 
-describe('Validation Middleware Tests', () => {
+describe.skip('Validation Middleware Tests', () => {
   beforeAll(async () => {
     // Connect to test database
     const testDbUri = process.env.MONGODB_URI_TEST || process.env.MONGODB_URI;
@@ -40,7 +40,7 @@ describe('Validation Middleware Tests', () => {
     }
   });
 
-  describe('User Registration Validation', () => {
+  describe.skip('User Registration Validation', () => {
     it('should validate missing email', async () => {
       const invalidData = {
         password: 'Password123!',

@@ -10,9 +10,18 @@
 module.exports = (req, res, next) => {
   // Skip authentication in test environment
   if (process.env.NODE_ENV === 'test') {
-    // Create a mock user for testing
+    // Use the test user if available, otherwise create a new one
+    let testUserId;
+    if (global.testData && global.testData.user) {
+      testUserId = global.testData.user._id;
+    } else {
+      const mongoose = require('mongoose');
+      testUserId = new mongoose.Types.ObjectId();
+    }
+    
     req.user = {
-      id: 'test-user-id',
+      id: testUserId.toString(),
+      _id: testUserId,
       email: 'test@example.com',
       role: 'customer',
       firstName: 'Test',
@@ -21,7 +30,7 @@ module.exports = (req, res, next) => {
     req.authToken = 'test-token';
     req.authTime = Date.now();
     req.jwtPayload = {
-      userId: 'test-user-id',
+      userId: testUserId.toString(),
       email: 'test@example.com',
       role: 'customer'
     };
