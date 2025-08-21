@@ -9,7 +9,6 @@
 const express = require('express');
 const auth = require('../middlewares/testAuth.js');
 const authorize = require('../middlewares/testAuth.js').authorize;
-const canAccessOwnData = require('../middlewares/canAccessOwnData.js');
 const router = express.Router();
 
 // Import controllers

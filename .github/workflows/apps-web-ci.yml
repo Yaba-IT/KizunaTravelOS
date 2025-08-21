@@ -11,11 +11,11 @@ on:
       - 'compose/**'
       - 'package.json'
 
+# Use minimal permissions by default, grant specific permissions only when needed
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-  id-token: write
+  contents: read
+  pull-requests: read
+  issues: read
 
 jobs:
   # Job to get changed files and determine what to test
@@ -63,9 +63,9 @@ jobs:
           echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-  # Main Web testing and validation job (for dev branch)
-  web-ci-dev:
-    name: WEB Tests & Build (Dev)
+  # PR to dev: Test → Build Dockerfile
+  web-dev-pipeline:
+    name: WEB Dev Pipeline (Test → Build)
     runs-on: ubuntu-latest
     needs: get-changed-files
     if: needs.get-changed-files.outputs.has-web-changes == 'true' && github.base_ref == 'dev'
@@ -84,148 +84,35 @@ jobs:
       - name: Install dependencies
         run: yarn workspace web install --frozen-lockfile
 
-      - name: Get changed test files
-        id: get-test-files
+      - name: Run linting
         run: |
-          BASE_COMMIT=$(git rev-parse origin/dev)
-          CHANGED_FILES=$(git diff --name-only $BASE_COMMIT HEAD)
-          
-          # Filter for test files in Web
-          TEST_FILES=$(echo "$CHANGED_FILES" | grep -E "apps/web/.*\.(test|spec)\.(js|jsx|ts|tsx)$" || true)
-          
-          # Filter for source files that have corresponding tests
-          SOURCE_FILES=$(echo "$CHANGED_FILES" | grep -E "apps/web/src/.*\.(js|jsx|ts|tsx)$" | grep -v "\.(test|spec)\.(js|jsx|ts|tsx)$" || true)
-          
-          # Find corresponding test files for changed source files
-          CORRESPONDING_TESTS=""
-          for file in $SOURCE_FILES; do
-            # Convert source file path to test file path
-            TEST_FILE=$(echo "$file" | sed 's/\.js$/.test.js/' | sed 's/\.jsx$/.test.jsx/' | sed 's/\.ts$/.test.ts/' | sed 's/\.tsx$/.test.tsx/')
-            if [ -f "$TEST_FILE" ]; then
-              CORRESPONDING_TESTS="$CORRESPONDING_TESTS $TEST_FILE"
-            fi
-          done
-          
-          # Combine all test files
-          ALL_TEST_FILES="$TEST_FILES $CORRESPONDING_TESTS"
-          
-          if [ -n "$ALL_TEST_FILES" ]; then
-            echo "test_files<<EOF" >> $GITHUB_OUTPUT
-            echo "$ALL_TEST_FILES" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-            echo "has_tests=true" >> $GITHUB_OUTPUT
-            echo "Running tests for files: $ALL_TEST_FILES"
-          else
-            echo "has_tests=false" >> $GITHUB_OUTPUT
-            echo "No test files found for changed files"
-          fi
+          cd apps/web
+          yarn lint
 
-      - name: Run ESLint
-        run: yarn workspace web lint
-
-      - name: Run Jest tests on changed files
-        id: run-tests
-        if: steps.get-test-files.outputs.has_tests == 'true'
+      - name: Run tests
         run: |
-          TEST_FILES="${{ steps.get-test-files.outputs.test_files }}"
-          echo "Running tests for: $TEST_FILES"
-          
-          # Run tests for specific files
-          yarn workspace web test --ci $TEST_FILES
-          
-          # Check if tests passed
-          if [ $? -eq 0 ]; then
-            echo "test_status=passed" >> $GITHUB_OUTPUT
-          else
-            echo "test_status=failed" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-
-      - name: Run all tests if no specific test files
-        id: run-all-tests
-        if: steps.get-test-files.outputs.has_tests == 'false'
-        run: |
-          echo "No specific test files found, running all tests"
-          yarn workspace web test --ci
-          
-          if [ $? -eq 0 ]; then
-            echo "test_status=passed" >> $GITHUB_OUTPUT
-          else
-            echo "test_status=failed" >> $GITHUB_OUTPUT
-            exit 1
-          fi
+          cd apps/web
+          yarn test
 
       - name: Build Docker image
-        id: build-docker
-        if: steps.run-tests.outputs.test_status == 'passed' || steps.run-all-tests.outputs.test_status == 'passed'
         run: |
-          echo "Building Docker image..."
-          docker build -t web:ci apps/web
-          
-          if [ $? -eq 0 ]; then
-            echo "docker_status=passed" >> $GITHUB_OUTPUT
-          else
-            echo "docker_status=failed" >> $GITHUB_OUTPUT
-            exit 1
-          fi
+          cd apps/web
+          docker build -t web:test .
 
-      - name: Test Docker Compose
-        id: test-compose
-        if: steps.build-docker.outputs.docker_status == 'passed'
-        run: |
-          echo "Testing Docker Compose..."
-          
-          # Start services in background
-          docker-compose -f compose/compose.base.yml -f compose/compose.dev.yml up -d mongo postgres rabbitmq
-          
-          # Wait for services to be ready
-          sleep 10
-          
-          # Test Web service
-          docker-compose -f compose/compose.base.yml -f compose/compose.dev.yml run --rm web echo "Web service test passed"
-          
-          if [ $? -eq 0 ]; then
-            echo "compose_status=passed" >> $GITHUB_OUTPUT
-          else
-            echo "compose_status=failed" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-          
-          # Cleanup
-          docker-compose -f compose/compose.base.yml -f compose/compose.dev.yml down
-
-      - name: Auto-merge PR
-        id: auto-merge
-        if: steps.test-compose.outputs.compose_status == 'passed'
+      - name: Comment on PR
         uses: actions/github-script@v7
         with:
           script: |
-            try {
-              await github.rest.pulls.merge({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number,
-                merge_method: 'squash'
-              });
-              console.log('PR auto-merged successfully');
-              return 'merged';
-            } catch (error) {
-              console.log('Auto-merge failed:', error.message);
-              return 'failed';
-            }
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ WEB Dev Pipeline: Tests passed and Docker image built successfully!'
+            })
 
-      - name: Create failure issue
-        if: failure()
-        run: |
-          echo "Creating failure issue for Web CI..."
-          echo "PR: ${{ github.event.pull_request.number }}"
-          echo "Branch: ${{ github.head_ref }} → ${{ github.base_ref }}"
-          echo "Commit: ${{ github.sha }}"
-        continue-on-error: true
-
-  # Docker Compose only job (for master branch)
-  web-compose-master:
-    name: WEB Docker Compose (Master)
+  # PR to master: Docker Compose
+  web-master-pipeline:
+    name: WEB Master Pipeline (Docker Compose)
     runs-on: ubuntu-latest
     needs: get-changed-files
     if: needs.get-changed-files.outputs.has-web-changes == 'true' && github.base_ref == 'master'
@@ -241,13 +128,13 @@ jobs:
           echo "Testing Docker Compose for master branch..."
           
           # Start services in background
-          docker-compose -f compose/compose.base.yml -f compose/compose.dev.yml up -d mongo postgres rabbitmq
+          docker compose -f compose/compose.base.yml -f compose/compose.dev.yml up -d mongo postgres rabbitmq
           
           # Wait for services to be ready
           sleep 10
           
           # Test Web service
-          docker-compose -f compose/compose.base.yml -f compose/compose.dev.yml run --rm web echo "Web service test passed"
+          docker compose -f compose/compose.base.yml -f compose/compose.dev.yml run --rm web echo "Web service test passed"
           
           if [ $? -eq 0 ]; then
             echo "compose_status=passed" >> $GITHUB_OUTPUT
@@ -257,7 +144,7 @@ jobs:
           fi
           
           # Cleanup
-          docker-compose -f compose/compose.base.yml -f compose/compose.dev.yml down
+          docker compose -f compose/compose.base.yml -f compose/compose.dev.yml down
 
       - name: Auto-merge PR
         id: auto-merge
@@ -279,14 +166,16 @@ jobs:
               return 'failed';
             }
 
-      - name: Create failure issue
-        if: failure()
-        run: |
-          echo "Creating failure issue for Web Docker Compose..."
-          echo "PR: ${{ github.event.pull_request.number }}"
-          echo "Branch: ${{ github.head_ref }} → ${{ github.base_ref }}"
-          echo "Commit: ${{ github.sha }}"
-        continue-on-error: true
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ WEB Master Pipeline: Docker Compose test passed! PR will be auto-merged.'
+            })
 
   # Job to handle PRs with no Web changes
   no-changes:
@@ -299,15 +188,9 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            try {
-              await github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: '✅ No Web changes detected in this PR. CI checks skipped.'
-              });
-              console.log('Comment added successfully');
-            } catch (error) {
-              console.log('Could not add comment to PR:', error.message);
-              // Continue without failing the workflow
-            }
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '⏭️ No Web changes detected. Skipping Web CI pipeline.'
+            })

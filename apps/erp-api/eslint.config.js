@@ -3,7 +3,14 @@ const globals = require('globals');
 
 module.exports = [
   {
-    ignores: ['dist/**', 'node_modules/**', '**/*.test.js', '**/*.spec.js', 'coverage/**'],
+    ignores: [
+      'dist/**', 
+      'node_modules/**', 
+      '**/*.test.js', 
+      '**/*.spec.js', 
+      'coverage/**',
+      'src/test-utils/**' // Ignore test utility files
+    ],
   },
   {
     files: ['**/*.js'],
@@ -12,6 +19,7 @@ module.exports = [
       globals: {
         ...globals.node,
         ...globals.es2022,
+        ...globals.jest, // Add Jest globals
       },
       parserOptions: {
         ecmaVersion: 'latest',

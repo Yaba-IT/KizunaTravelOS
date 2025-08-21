@@ -156,7 +156,7 @@ exports.getMyBooking = async (req, res) => {
  */
 exports.createBooking = async (req, res) => {
   try {
-    const { journeyId, date, participants = 1, specialRequests } = req.body;
+    const { journeyId, date, participants = 1 } = req.body;
 
     // Validation
     if (!journeyId || !date) {
