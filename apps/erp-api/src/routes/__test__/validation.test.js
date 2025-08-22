@@ -8,6 +8,7 @@
 
 const request = require('supertest');
 const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 require('dotenv').config();
 
 // Set test environment
@@ -26,18 +27,18 @@ if (app.listen) {
 }
 
 describe.skip('Validation Middleware Tests', () => {
+  let mongoServer;
+
   beforeAll(async () => {
-    // Connect to test database
-    const testDbUri = process.env.MONGODB_URI_TEST || process.env.MONGODB_URI;
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(testDbUri);
-    }
+    // Use in-memory database for testing
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    await mongoose.connect(mongoUri);
   }, 15000);
 
   afterAll(async () => {
-    if (mongoose.connection.readyState === 1) {
-      await mongoose.connection.close();
-    }
+    await mongoose.disconnect();
+    await mongoServer.stop();
   });
 
   describe.skip('User Registration Validation', () => {
