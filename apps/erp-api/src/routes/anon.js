@@ -13,7 +13,6 @@ const router = express.Router();
 // Controllers
 const userCtrl = require('../controllers/user.js');
 const journeyCtrl = require('../controllers/journey.js');
-const providerCtrl = require('../controllers/provider.js');
 
 // util: wrap async
 const wrap = require('../utils/wrap.js');
@@ -92,20 +91,6 @@ router.get('/journeys/search', wrap(journeyCtrl.searchPublicJourneys));
  */
 router.get('/journeys/:journeyId', guardId('journeyId'), wrap(journeyCtrl.getPublicJourneyDetails));
 
-/**
- * @route   GET /providers
- * @desc    Get public provider information
- * @access  Public
- */
-router.get('/providers', wrap(providerCtrl.getPublicProviders));
-
-/**
- * @route   GET /providers/:providerId
- * @desc    Get public provider details
- * @access  Public
- */
-router.get('/providers/:providerId', guar('providerId'), wrap(providerCtrl.getPublicProviderDetails));
-
 // ========================================
 // SYSTEM ROUTES
 // ========================================
@@ -140,18 +125,15 @@ router.get('/health', async (req, res) => {
       // Check database connection
       const mongoose = require('mongoose');
       healthCheck.services.database = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-    } catch (error) {
+    } catch {
       healthCheck.services.database = 'error';
     }
   
     try {
-      // Check Redis connection
-      if (redisClient && redisClient.connected) {
-        healthCheck.services.redis = 'connected';
-      } else {
-        healthCheck.services.redis = 'disconnected';
-      }
-    } catch (error) {
+      // Check Redis connection (would need to import redisClient if available)
+      // TODO: Import redisClient to enable this check
+      healthCheck.services.redis = 'not_implemented';
+    } catch {
       healthCheck.services.redis = 'error';
     }
   
@@ -165,7 +147,7 @@ router.get('/health', async (req, res) => {
         external: Math.round(memUsage.external / 1024 / 1024)
       };
       healthCheck.services.memory = memUsageMB;
-    } catch (error) {
+    } catch {
       healthCheck.services.memory = 'error';
     }
   

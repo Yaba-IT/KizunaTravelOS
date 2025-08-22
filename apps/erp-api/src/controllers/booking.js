@@ -94,7 +94,7 @@ exports.getMyBookings = async (req, res) => {
 
     // Build query for current user
     const query = { 
-      customerId: req.user.id,
+      customerId: req.user._id,
       'meta.isDeleted': false 
     };
     
@@ -132,8 +132,8 @@ exports.getMyBookings = async (req, res) => {
 exports.getMyBooking = async (req, res) => {
   try {
     const booking = await Booking.findOne({
-      _id: req.params.id,
-      customerId: req.user.id,
+      _id: req.params.bookingId,
+      customerId: req.user._id,
       'meta.isDeleted': false
     }).populate('journeyId', 'name price duration category itinerary');
 
@@ -156,7 +156,7 @@ exports.getMyBooking = async (req, res) => {
  */
 exports.createBooking = async (req, res) => {
   try {
-    const { journeyId, date, participants = 1, specialRequests } = req.body;
+    const { journeyId, date, participants = 1 } = req.body;
 
     // Validation
     if (!journeyId || !date) {
@@ -183,19 +183,21 @@ exports.createBooking = async (req, res) => {
     }
 
     // Calculate total price
-    const totalPrice = journey.price * participants;
+    const totalPrice = journey.pricing.basePrice * participants;
 
     // Create booking
     const booking = new Booking({
-      customerId: req.user.id,
+      customerId: req.user._id,
       journeyId,
-      date: bookingDate,
-      participants,
+      travelDate: bookingDate,
+      basePrice: journey.pricing.basePrice,
       totalPrice,
-      specialRequests,
+      contactEmail: req.user.email,
+      contactPhone: req.user.phone || '+1234567890', // Default if not available
+      paymentMethod: 'credit_card', // Default payment method
       status: 'pending',
       meta: {
-        created_by: req.user.id
+        created_by: req.user._id
       }
     });
 
@@ -271,7 +273,7 @@ exports.createBookingForCustomer = async (req, res) => {
       specialRequests,
       status: 'pending',
       meta: {
-        created_by: req.user.id
+        created_by: req.user._id
       }
     });
 
@@ -302,8 +304,8 @@ exports.updateMyBooking = async (req, res) => {
     const { date, participants, specialRequests } = req.body;
 
     const booking = await Booking.findOne({
-      _id: req.params.id,
-      customerId: req.user.id,
+      _id: req.params.bookingId,
+      customerId: req.user._id,
       'meta.isDeleted': false
     });
 
@@ -332,7 +334,7 @@ exports.updateMyBooking = async (req, res) => {
       // Recalculate total price
       const journey = await Journey.findById(booking.journeyId);
       if (journey) {
-        booking.totalPrice = journey.price * participants;
+        booking.totalPrice = journey.pricing.basePrice * participants;
       }
     }
 
@@ -341,11 +343,11 @@ exports.updateMyBooking = async (req, res) => {
     }
 
     // Update meta
-    booking.meta.updated_by = req.user.id;
+    booking.meta.updated_by = req.user._id;
     await booking.save();
 
     // Populate journey details for response
-    await booking.populate('journeyId', 'name price duration');
+    await booking.populate('journeyId', 'name pricing duration');
 
     res.json({
       message: 'Booking updated successfully',
@@ -391,7 +393,7 @@ exports.updateBooking = async (req, res) => {
       // Recalculate total price
       const journey = await Journey.findById(booking.journeyId);
       if (journey) {
-        booking.totalPrice = journey.price * participants;
+        booking.totalPrice = journey.pricing.basePrice * participants;
       }
     }
 
@@ -404,12 +406,12 @@ exports.updateBooking = async (req, res) => {
     }
 
     // Update meta
-    booking.meta.updated_by = req.user.id;
+    booking.meta.updated_by = req.user._id;
     await booking.save();
 
     // Populate details for response
     await booking.populate('customerId', 'email role');
-    await booking.populate('journeyId', 'name price duration');
+    await booking.populate('journeyId', 'name pricing duration');
 
     res.json({
       message: 'Booking updated successfully',
@@ -483,8 +485,8 @@ exports.updateBookingStatus = async (req, res) => {
 exports.cancelMyBooking = async (req, res) => {
   try {
     const booking = await Booking.findOne({
-      _id: req.params.id,
-      customerId: req.user.id,
+      _id: req.params.bookingId,
+      customerId: req.user._id,
       'meta.isDeleted': false
     });
 
@@ -501,7 +503,7 @@ exports.cancelMyBooking = async (req, res) => {
 
     // Update status to cancelled
     booking.status = 'cancelled';
-    booking.meta.updated_by = req.user.id;
+    booking.meta.updated_by = req.user._id;
     await booking.save();
 
     res.json({
@@ -537,7 +539,7 @@ exports.deleteBooking = async (req, res) => {
 
     // Soft delete
     booking.meta.delete();
-    booking.meta.updated_by = req.user.id;
+    booking.meta.updated_by = req.user._id;
     await booking.save();
 
     res.json({
@@ -562,7 +564,7 @@ exports.getMyAssignedBookings = async (req, res) => {
 
     // Get journeys assigned to this guide
     const assignedJourneys = await Journey.find({
-      guideId: req.user.id,
+      guideId: req.user._id,
       'meta.isDeleted': false
     }).select('_id');
 
@@ -621,7 +623,7 @@ exports.getMyAssignedBooking = async (req, res) => {
     }
 
     // Verify guide assignment
-    if (booking.journeyId.guideId.toString() !== req.user.id) {
+    if (booking.journeyId.guideId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ error: 'Not authorized to view this booking' });
     }
 

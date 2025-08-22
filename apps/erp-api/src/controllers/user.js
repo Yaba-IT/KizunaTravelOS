@@ -6,9 +6,10 @@
 * coded by farid212@Yaba-IT!
 */
 
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Profile = require('../models/Profile');
-const bcrypt = require('bcryptjs');
+// const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
@@ -67,21 +68,9 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Create user
-    const user = new User({
-      email,
-      password,
-      role: role || 'customer',
-      meta: {
-        created_by: req.user?.id || null
-      }
-    });
-
-    await user.save();
-
-    // Create profile
+    // Create profile first
     const profile = new Profile({
-      userId: user._id,
+      userId: new mongoose.Types.ObjectId(),
       firstname: firstname || '',
       lastname: lastname || '',
       sexe: sexe || 'X',
@@ -93,9 +82,22 @@ exports.register = async (req, res) => {
 
     await profile.save();
 
-    // Update user with profile reference
-    user.profileId = profile._id;
+    // Create user with profile reference
+    const user = new User({
+      email,
+      password,
+      role: role || 'customer',
+      profileId: profile._id,
+      meta: {
+        created_by: req.user?.id || null
+      }
+    });
+
     await user.save();
+
+    // Update profile with actual user ID
+    profile.userId = user._id;
+    await profile.save();
 
     // Generate token
     const token = generateToken(user._id, user.role);

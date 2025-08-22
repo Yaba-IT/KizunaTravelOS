@@ -6,7 +6,7 @@ describe('HelloWorld Component in index.jsx', () => {
   afterEach(() => {
     cleanup();
   }),
-    it('renders an <h1> with the text "HelloWorld"', () => {
+    it('renders an <h2> with the text "HelloWorld"', () => {
       render(<HelloWorld />);
       const heading = screen.getByRole('heading', { level: 2 });
       expect(heading).toHaveTextContent('Hello World');

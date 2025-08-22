@@ -1,7 +1,8 @@
 {
+  "private": true,
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1"
   },
-  "workspaces": ["web", "erp-api", "accounting-svc"]
+  "workspaces": ["apps/*"]
 }

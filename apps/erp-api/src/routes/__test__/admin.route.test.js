@@ -81,6 +81,33 @@ jest.mock('../../middlewares/dataValidation.js', () => ({
   validateData: () => (req, res, next) => next()
 }));
 
+// Mock the auth middleware
+jest.mock('../../middlewares/auth.js', () => (req, res, next) => {
+  req.user = { id: '12345', role: 'admin' };
+  next();
+});
+
+// Mock the authorize middleware
+jest.mock('../../middlewares/authorize.js', () => (roles) => (req, res, next) => {
+  if (roles.includes(req.user.role)) {
+    next();
+  } else {
+    res.status(403).json({ error: 'Forbidden' });
+  }
+});
+
+// Mock the guardId utility
+jest.mock('../../utils/guardId.js', () => (paramName) => (req, res, next) => {
+  // Always pass validation for testing
+  next();
+});
+
+// Mock the wrap utility
+jest.mock('../../utils/wrap.js', () => (fn) => (req, res, next) => {
+  // Execute the function directly for testing
+  return fn(req, res, next);
+});
+
 const adminRouter = require('../admin');
 
 describe('Admin routes', () => {
@@ -89,29 +116,17 @@ describe('Admin routes', () => {
   beforeEach(() => {
     app = express();
     app.use(express.json());
+    app.use('/admin', adminRouter);
   });
 
   describe('Authentication and Authorization', () => {
     it('should allow access with correct role', async () => {
-      const fakeAuth = (req, res, next) => {
-        req.user = { id: '12345', role: 'admin' };
-        next();
-      };
-      app.use('/admin', fakeAuth, adminRouter);
-      
       const res = await request(app).get('/admin/users');
       expect(res.status).toBe(200);
     });
   });
 
   describe('User management routes', () => {
-    beforeEach(() => {
-      const fakeAuth = (req, res, next) => {
-        req.user = { id: '12345', role: 'admin' };
-        next();
-      };
-      app.use('/admin', fakeAuth, adminRouter);
-    });
 
     it('should handle GET /users', async () => {
       const res = await request(app).get('/admin/users');
@@ -158,13 +173,6 @@ describe('Admin routes', () => {
   });
 
   describe('Profile management routes', () => {
-    beforeEach(() => {
-      const fakeAuth = (req, res, next) => {
-        req.user = { id: '12345', role: 'admin' };
-        next();
-      };
-      app.use('/admin', fakeAuth, adminRouter);
-    });
 
     it('should handle GET /profiles', async () => {
       const res = await request(app).get('/admin/profiles');

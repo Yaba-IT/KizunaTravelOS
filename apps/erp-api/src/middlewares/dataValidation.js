@@ -98,7 +98,7 @@ const validationSchemas = {
         },
         phone: {
           type: 'string',
-          pattern: /^[\+]?[1-9][\d]{0,15}$/,
+          pattern: /^[+]?[1-9][\d]{0,15}$/,
           message: 'Contact phone must be a valid international phone number'
         }
       }

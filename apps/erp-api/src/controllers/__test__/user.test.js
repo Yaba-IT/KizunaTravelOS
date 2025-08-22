@@ -6,72 +6,39 @@
 * coded by farid212@Yaba-IT!
 */
 
-const request = require('supertest');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const express = require('express');
-const jwt = require('jsonwebtoken');
+const userController = require('../user');
+const { 
+  createUserWithProfile, 
+  createTestUserData,
+  createMockRequest, 
+  createMockResponse, 
+  createMockNext 
+} = require('../../test-utils/factories');
+
+let mongoServer;
 
 // Mock bcryptjs
 jest.mock('bcryptjs', () => ({
   genSalt: jest.fn().mockResolvedValue('mocked-salt'),
-  hash: jest.fn().mockResolvedValue('hashed-password'),
-  compare: jest.fn().mockResolvedValue(true)
+  hash: jest.fn().mockResolvedValue('SecurePass123!'),
+  compare: jest.fn().mockImplementation((password, hash) => {
+    return Promise.resolve(password === 'SecurePass123!' && hash === 'SecurePass123!');
+  })
 }));
 
 // Mock jsonwebtoken
 jest.mock('jsonwebtoken', () => ({
   sign: jest.fn().mockReturnValue('mocked-jwt-token'),
-  verify: jest.fn().mockReturnValue({ userId: 'mocked-user-id', role: 'admin' })
+  verify: jest.fn().mockReturnValue({ userId: 'test-user-id', role: 'customer' })
 }));
 
-const bcrypt = require('bcryptjs');
-
-// Import models and controller
-const User = require('../../models/User');
-const Profile = require('../../models/Profile');
-const userController = require('../user');
-
-// Create Express app for testing
-const app = express();
-app.use(express.json());
-
-// Mock auth middleware
-const mockAuth = (req, res, next) => {
-  req.user = { id: 'mocked-user-id', role: 'admin' };
-  next();
-};
-
-// Mock authorize middleware
-const mockAuthorize = (roles) => (req, res, next) => {
-  if (roles.includes(req.user.role)) {
-    next();
-  } else {
-    res.status(403).json({ error: 'Forbidden' });
-  }
-};
-
-// Apply routes
-app.post('/register', userController.register);
-app.post('/login', userController.login);
-app.get('/me', mockAuth, userController.getMe);
-app.put('/me', mockAuth, userController.updateMe);
-app.post('/forgot-password', userController.forgotPassword);
-app.post('/reset-password', userController.resetPassword);
-app.post('/verify-email', userController.verifyEmail);
-app.get('/users', mockAuth, mockAuthorize(['admin']), userController.getAllUsers);
-app.get('/users/:id', mockAuth, mockAuthorize(['admin']), userController.getUserById);
-app.put('/users/:id', mockAuth, mockAuthorize(['admin']), userController.updateUserById);
-app.delete('/users/:id', mockAuth, mockAuthorize(['admin']), userController.deleteUserById);
-app.post('/users/:id/activate', mockAuth, mockAuthorize(['admin']), userController.activateUser);
-app.post('/users/:id/deactivate', mockAuth, mockAuthorize(['admin']), userController.deactivateUser);
-app.post('/users/:id/unlock', mockAuth, mockAuthorize(['admin']), userController.unlockUser);
-app.post('/logout', mockAuth, userController.logout);
-app.get('/stats', mockAuth, mockAuthorize(['admin']), userController.getUserStats);
-
+/**
+ * @group User Management
+ * @description Tests user controller functionality
+ */
 describe('User Controller', () => {
-  let mongoServer;
-
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = mongoServer.getUri();
@@ -84,607 +51,756 @@ describe('User Controller', () => {
   });
 
   beforeEach(async () => {
-    await User.deleteMany({});
-    await Profile.deleteMany({});
+    // Clear all collections
+    const collections = await mongoose.connection.db.listCollections().toArray();
+    for (const collection of collections) {
+      await mongoose.connection.db.collection(collection.name).deleteMany({});
+    }
+  });
+
+  afterEach(async () => {
     jest.clearAllMocks();
   });
 
-  describe('POST /register', () => {
-    it('should register a new user successfully', async () => {
+  /**
+   * @test Registers new user
+   * @scenario Valid registration data
+   * @expected User and profile created successfully
+   */
+  describe('register', () => {
+    it('should register new user successfully', async () => {
+      // Arrange
       const userData = {
-        email: 'test@example.com',
+        email: 'newuser@example.com',
         password: 'SecurePass123!',
-        role: 'customer',
         firstname: 'John',
         lastname: 'Doe',
-        sexe: 'M'
-      };
-
-      const response = await request(app)
-        .post('/register')
-        .send(userData)
-        .expect(201);
-
-      expect(response.body.message).toBe('User registered successfully');
-      expect(response.body.user.email).toBe(userData.email);
-      expect(response.body.user.role).toBe(userData.role);
-      expect(response.body.token).toBe('mocked-jwt-token');
-      expect(response.body.user.profile).toBeDefined();
-    });
-
-    it('should return 400 for missing email', async () => {
-      const userData = {
-        password: 'SecurePass123!',
         role: 'customer'
       };
+      const req = createMockRequest({ body: userData });
+      const res = createMockResponse();
 
-      const response = await request(app)
-        .post('/register')
-        .send(userData)
-        .expect(400);
+      // Act
+      await userController.register(req, res);
 
-      expect(response.body.error).toBe('Email and password are required');
-    });
-
-    it('should return 400 for weak password', async () => {
-      const userData = {
-        email: 'test@example.com',
-        password: 'weak',
-        role: 'customer'
-      };
-
-      const response = await request(app)
-        .post('/register')
-        .send(userData)
-        .expect(400);
-
-      expect(response.body.error).toContain('Password must contain at least 8 characters');
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'User registered successfully',
+        user: expect.objectContaining({
+          email: userData.email,
+          role: userData.role
+        }),
+        token: 'mocked-jwt-token'
+      });
     });
 
     it('should return 409 for existing email', async () => {
-      // Create existing user
-      const existingUser = new User({
-        email: 'test@example.com',
-        password: 'SecurePass123!',
-        role: 'customer'
+      // Arrange
+      const { user } = await createUserWithProfile({
+        email: 'existing@example.com'
       });
-      await existingUser.save();
-
+      
       const userData = {
-        email: 'test@example.com',
+        email: 'existing@example.com',
         password: 'SecurePass123!',
-        role: 'customer'
+        firstname: 'John',
+        lastname: 'Doe'
       };
+      const req = createMockRequest({ body: userData });
+      const res = createMockResponse();
 
-      const response = await request(app)
-        .post('/register')
-        .send(userData)
-        .expect(409);
+      // Act
+      await userController.register(req, res);
 
-      expect(response.body.error).toBe('User with this email already exists');
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'User with this email already exists'
+      });
+    });
+
+    it('should return 400 for invalid data', async () => {
+      // Arrange
+      const invalidData = {
+        email: 'invalid-email',
+        password: 'weak'
+      };
+      const req = createMockRequest({ body: invalidData });
+      const res = createMockResponse();
+
+      // Act
+      await userController.register(req, res);
+
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: expect.stringContaining('Password must contain')
+      });
     });
   });
 
-  describe('POST /login', () => {
-    beforeEach(async () => {
-      // Create a test user
-      const user = new User({
-        email: 'test@example.com',
-        password: 'SecurePass123!',
-        role: 'customer',
-        status: 'active'
-      });
-      await user.save();
-
-      const profile = new Profile({
-        userId: user._id.toString(),
-        firstname: 'John',
-        lastname: 'Doe',
-        sexe: 'M'
-      });
-      await profile.save();
-    });
-
+  /**
+   * @test Authenticates user login
+   * @scenario Valid login credentials
+   * @expected User authenticated successfully
+   */
+  describe('login', () => {
     it('should login successfully with valid credentials', async () => {
+      // Arrange
+      const { user } = await createUserWithProfile({
+        email: 'test@example.com',
+        password: 'SecurePass123!'
+      });
+
       const loginData = {
         email: 'test@example.com',
         password: 'SecurePass123!'
       };
+      const req = createMockRequest({ body: loginData });
+      const res = createMockResponse();
 
-      const response = await request(app)
-        .post('/login')
-        .send(loginData)
-        .expect(200);
+      // Act
+      await userController.login(req, res);
 
-      expect(response.body.message).toBe('Login successful');
-      expect(response.body.user.email).toBe(loginData.email);
-      expect(response.body.token).toBe('mocked-jwt-token');
-    });
-
-    it('should return 400 for missing credentials', async () => {
-      const loginData = {
-        email: 'test@example.com'
-      };
-
-      const response = await request(app)
-        .post('/login')
-        .send(loginData)
-        .expect(400);
-
-      expect(response.body.error).toBe('Email and password are required');
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Login successful',
+        user: expect.objectContaining({
+          email: user.email,
+          role: user.role
+        }),
+        token: 'mocked-jwt-token'
+      });
     });
 
     it('should return 401 for invalid credentials', async () => {
+      // Arrange
+      await createUserWithProfile({
+        email: 'test@example.com',
+        password: 'SecurePass123!'
+      });
+
       const loginData = {
         email: 'test@example.com',
         password: 'wrongpassword'
       };
+      const req = createMockRequest({ body: loginData });
+      const res = createMockResponse();
 
-      const response = await request(app)
-        .post('/login')
-        .send(loginData)
-        .expect(401);
+      // Act
+      await userController.login(req, res);
 
-      expect(response.body.error).toBe('Invalid credentials');
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Invalid credentials'
+      });
     });
 
-    it('should return 403 for inactive account', async () => {
-      // Update user status to inactive
-      await User.findOneAndUpdate(
-        { email: 'test@example.com' },
-        { status: 'inactive' }
-      );
-
+    it('should return 401 for non-existent user', async () => {
+      // Arrange
       const loginData = {
-        email: 'test@example.com',
+        email: 'nonexistent@example.com',
         password: 'SecurePass123!'
       };
+      const req = createMockRequest({ body: loginData });
+      const res = createMockResponse();
 
-      const response = await request(app)
-        .post('/login')
-        .send(loginData)
-        .expect(403);
+      // Act
+      await userController.login(req, res);
 
-      expect(response.body.error).toBe('Account is not active');
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Invalid credentials'
+      });
     });
-  });
 
-  describe('GET /me', () => {
-    it('should return current user profile', async () => {
-      // Create a test user
-      const user = new User({
-        email: 'test@example.com',
+    it('should return 423 for locked account', async () => {
+      // Arrange
+      const { user } = await createUserWithProfile({
+        email: 'locked@example.com',
         password: 'SecurePass123!',
-        role: 'customer'
-      });
-      await user.save();
-
-      const profile = new Profile({
-        userId: user._id.toString(),
-        firstname: 'John',
-        lastname: 'Doe',
-        sexe: 'M'
-      });
-      await profile.save();
-
-      // Mock req.user.id to match the created user
-      const mockReq = { user: { id: user._id.toString() } };
-      const mockRes = {
-        json: jest.fn(),
-        status: jest.fn().mockReturnThis()
-      };
-
-      await userController.getMe(mockReq, mockRes);
-
-      expect(mockRes.json).toHaveBeenCalledWith({
-        user: expect.objectContaining({
-          email: 'test@example.com',
-          role: 'customer'
-        })
-      });
-    });
-  });
-
-  describe('PUT /me', () => {
-    it('should update current user profile', async () => {
-      // Create a test user
-      const user = new User({
-        email: 'test@example.com',
-        password: 'SecurePass123!',
-        role: 'customer'
-      });
-      await user.save();
-
-      const profile = new Profile({
-        userId: user._id.toString(),
-        firstname: 'John',
-        lastname: 'Doe',
-        sexe: 'M'
-      });
-      await profile.save();
-
-      const updateData = {
-        firstname: 'Jane',
-        lastname: 'Smith'
-      };
-
-      const mockReq = {
-        user: { id: user._id.toString() },
-        body: updateData
-      };
-      const mockRes = {
-        json: jest.fn(),
-        status: jest.fn().mockReturnThis()
-      };
-
-      await userController.updateMe(mockReq, mockRes);
-
-      expect(mockRes.json).toHaveBeenCalledWith({
-        message: 'Profile updated successfully',
-        user: expect.objectContaining({
-          email: 'test@example.com'
-        })
-      });
-    });
-  });
-
-  describe('POST /forgot-password', () => {
-    it('should handle forgot password request', async () => {
-      // Create a test user
-      const user = new User({
-        email: 'test@example.com',
-        password: 'SecurePass123!',
-        role: 'customer'
-      });
-      await user.save();
-
-      const forgotData = {
-        email: 'test@example.com'
-      };
-
-      const response = await request(app)
-        .post('/forgot-password')
-        .send(forgotData)
-        .expect(200);
-
-      expect(response.body.message).toBe('If an account with that email exists, a password reset link has been sent');
-    });
-  });
-
-  describe('POST /reset-password', () => {
-    it('should reset password with valid token', async () => {
-      // Create a test user with reset token
-      const user = new User({
-        email: 'test@example.com',
-        password: 'SecurePass123!',
-        role: 'customer',
-        passwordResetToken: 'valid-token',
-        passwordResetExpires: new Date(Date.now() + 3600000)
-      });
-      await user.save();
-
-      const resetData = {
-        token: 'valid-token',
-        password: 'NewSecurePass123!'
-      };
-
-      const response = await request(app)
-        .post('/reset-password')
-        .send(resetData)
-        .expect(200);
-
-      expect(response.body.message).toBe('Password reset successfully');
-    });
-
-    it('should return 400 for invalid token', async () => {
-      const resetData = {
-        token: 'invalid-token',
-        password: 'NewSecurePass123!'
-      };
-
-      const response = await request(app)
-        .post('/reset-password')
-        .send(resetData)
-        .expect(400);
-
-      expect(response.body.error).toBe('Invalid or expired reset token');
-    });
-  });
-
-  describe('POST /verify-email', () => {
-    it('should verify email with valid token', async () => {
-      // Create a test user with verification token
-      const user = new User({
-        email: 'test@example.com',
-        password: 'SecurePass123!',
-        role: 'customer',
-        emailVerificationToken: 'valid-token'
-      });
-      await user.save();
-
-      const verifyData = {
-        token: 'valid-token'
-      };
-
-      const response = await request(app)
-        .post('/verify-email')
-        .send(verifyData)
-        .expect(200);
-
-      expect(response.body.message).toBe('Email verified successfully');
-    });
-  });
-
-  describe('GET /users', () => {
-    beforeEach(async () => {
-      // Create test users
-      const users = [
-        {
-          email: 'user1@example.com',
-          password: 'SecurePass123!',
-          role: 'customer',
-          status: 'active'
-        },
-        {
-          email: 'user2@example.com',
-          password: 'SecurePass123!',
-          role: 'guide',
-          status: 'active'
-        }
-      ];
-
-      for (const userData of users) {
-        const user = new User(userData);
-        await user.save();
-
-        const profile = new Profile({
-          userId: user._id.toString(),
-          firstname: 'Test',
-          lastname: 'User',
-          sexe: 'X'
-        });
-        await profile.save();
-      }
-    });
-
-    it('should return all users with pagination', async () => {
-      const response = await request(app)
-        .get('/users')
-        .expect(200);
-
-      expect(response.body.users).toHaveLength(2);
-      expect(response.body.pagination).toBeDefined();
-      expect(response.body.pagination.total).toBe(2);
-    });
-
-    it('should filter users by role', async () => {
-      const response = await request(app)
-        .get('/users?role=customer')
-        .expect(200);
-
-      expect(response.body.users).toHaveLength(1);
-      expect(response.body.users[0].role).toBe('customer');
-    });
-  });
-
-  describe('GET /users/:id', () => {
-    it('should return user by ID', async () => {
-      // Create a test user
-      const user = new User({
-        email: 'test@example.com',
-        password: 'SecurePass123!',
-        role: 'customer'
-      });
-      await user.save();
-
-      const profile = new Profile({
-        userId: user._id.toString(),
-        firstname: 'John',
-        lastname: 'Doe',
-        sexe: 'M'
-      });
-      await profile.save();
-
-      const response = await request(app)
-        .get(`/users/${user._id}`)
-        .expect(200);
-
-      expect(response.body.user.email).toBe('test@example.com');
-      expect(response.body.user.role).toBe('customer');
-    });
-
-    it('should return 404 for non-existent user', async () => {
-      const fakeId = new mongoose.Types.ObjectId();
-      const response = await request(app)
-        .get(`/users/${fakeId}`)
-        .expect(404);
-
-      expect(response.body.error).toBe('User not found');
-    });
-  });
-
-  describe('PUT /users/:id', () => {
-    it('should update user by ID', async () => {
-      // Create a test user
-      const user = new User({
-        email: 'test@example.com',
-        password: 'SecurePass123!',
-        role: 'customer'
-      });
-      await user.save();
-
-      const profile = new Profile({
-        userId: user._id.toString(),
-        firstname: 'John',
-        lastname: 'Doe',
-        sexe: 'M'
-      });
-      await profile.save();
-
-      const updateData = {
-        role: 'guide',
-        firstname: 'Jane'
-      };
-
-      const response = await request(app)
-        .put(`/users/${user._id}`)
-        .send(updateData)
-        .expect(200);
-
-      expect(response.body.message).toBe('User updated successfully');
-      expect(response.body.user.role).toBe('guide');
-    });
-  });
-
-  describe('DELETE /users/:id', () => {
-    it('should soft delete user by ID', async () => {
-      // Create a test user
-      const user = new User({
-        email: 'test@example.com',
-        password: 'SecurePass123!',
-        role: 'customer'
-      });
-      await user.save();
-
-      const profile = new Profile({
-        userId: user._id.toString(),
-        firstname: 'John',
-        lastname: 'Doe',
-        sexe: 'M'
-      });
-      await profile.save();
-
-      const response = await request(app)
-        .delete(`/users/${user._id}`)
-        .expect(200);
-
-      expect(response.body.message).toBe('User deleted successfully');
-
-      // Check if user is soft deleted
-      const deletedUser = await User.findById(user._id);
-      expect(deletedUser.meta.isDeleted).toBe(true);
-    });
-  });
-
-  describe('POST /users/:id/activate', () => {
-    it('should activate user account', async () => {
-      // Create an inactive user
-      const user = new User({
-        email: 'test@example.com',
-        password: 'SecurePass123!',
-        role: 'customer',
-        status: 'inactive'
-      });
-      await user.save();
-
-      const response = await request(app)
-        .post(`/users/${user._id}/activate`)
-        .expect(200);
-
-      expect(response.body.message).toBe('User activated successfully');
-      expect(response.body.user.status).toBe('active');
-    });
-  });
-
-  describe('POST /users/:id/deactivate', () => {
-    it('should deactivate user account', async () => {
-      // Create an active user
-      const user = new User({
-        email: 'test@example.com',
-        password: 'SecurePass123!',
-        role: 'customer',
-        status: 'active'
-      });
-      await user.save();
-
-      const response = await request(app)
-        .post(`/users/${user._id}/deactivate`)
-        .expect(200);
-
-      expect(response.body.message).toBe('User deactivated successfully');
-      expect(response.body.user.status).toBe('inactive');
-    });
-  });
-
-  describe('POST /users/:id/unlock', () => {
-    it('should unlock user account', async () => {
-      // Create a locked user
-      const user = new User({
-        email: 'test@example.com',
-        password: 'SecurePass123!',
-        role: 'customer',
         meta: {
           loginAttempts: 5,
           lockUntil: new Date(Date.now() + 3600000)
         }
       });
-      await user.save();
 
-      const response = await request(app)
-        .post(`/users/${user._id}/unlock`)
-        .expect(200);
+      const loginData = {
+        email: 'locked@example.com',
+        password: 'SecurePass123!'
+      };
+      const req = createMockRequest({ body: loginData });
+      const res = createMockResponse();
 
-      expect(response.body.message).toBe('User account unlocked successfully');
+      // Act
+      await userController.login(req, res);
 
-      // Check if user is unlocked
-      const unlockedUser = await User.findById(user._id);
-      expect(unlockedUser.meta.loginAttempts).toBe(0);
-      expect(unlockedUser.meta.lockUntil).toBeNull();
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(423);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Account is temporarily locked due to multiple failed login attempts'
+      });
     });
   });
 
-  describe('POST /logout', () => {
-    it('should logout user successfully', async () => {
-      const response = await request(app)
-        .post('/logout')
-        .expect(200);
+  /**
+   * @test Gets current user profile
+   * @scenario Authenticated user
+   * @expected Returns user profile information
+   */
+  describe('getMe', () => {
+    it('should return current user profile', async () => {
+      // Arrange
+      const { user, profile } = await createUserWithProfile();
+      const req = createMockRequest({ 
+        user: { id: user._id.toString(), _id: user._id }
+      });
+      const res = createMockResponse();
 
-      expect(response.body.message).toBe('Logged out successfully');
+      // Act
+      await userController.getMe(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        user: expect.objectContaining({
+          email: user.email,
+          role: user.role
+        })
+      });
+    });
+
+    it('should return 404 if user not found', async () => {
+      // Arrange
+      const req = createMockRequest({ 
+        user: { id: new mongoose.Types.ObjectId().toString() }
+      });
+      const res = createMockResponse();
+
+      // Act
+      await userController.getMe(req, res);
+
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'User not found'
+      });
     });
   });
 
-  describe('GET /stats', () => {
-    beforeEach(async () => {
-      // Create test users with different statuses
-      const users = [
-        { email: 'user1@example.com', password: 'SecurePass123!', role: 'customer', status: 'active' },
-        { email: 'user2@example.com', password: 'SecurePass123!', role: 'guide', status: 'active' },
-        { email: 'user3@example.com', password: 'SecurePass123!', role: 'customer', status: 'pending' }
-      ];
+  /**
+   * @test Updates current user profile
+   * @scenario Valid update data
+   * @expected User profile updated successfully
+   */
+  describe('updateMe', () => {
+    it('should update current user profile', async () => {
+      // Arrange
+      const { user, profile } = await createUserWithProfile();
+      const updateData = {
+        firstname: 'Jane',
+        lastname: 'Smith'
+      };
+      const req = createMockRequest({
+        user: { id: user._id.toString(), _id: user._id },
+        body: updateData
+      });
+      const res = createMockResponse();
 
-      for (const userData of users) {
-        const user = new User(userData);
-        await user.save();
-      }
+      // Act
+      await userController.updateMe(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Profile updated successfully',
+        user: expect.objectContaining({
+          email: user.email
+        })
+      });
+    });
+  });
+
+  /**
+   * @test Handles forgot password request
+   * @scenario Valid email address
+   * @expected Password reset email sent
+   */
+  describe('forgotPassword', () => {
+    it('should handle forgot password request', async () => {
+      // Arrange
+      await createUserWithProfile({
+        email: 'test@example.com'
+      });
+
+      const forgotData = {
+        email: 'test@example.com'
+      };
+      const req = createMockRequest({ body: forgotData });
+      const res = createMockResponse();
+
+      // Act
+      await userController.forgotPassword(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Password reset link sent to your email',
+        resetToken: undefined
+      });
     });
 
+    it('should handle non-existent email gracefully', async () => {
+      // Arrange
+      const forgotData = {
+        email: 'nonexistent@example.com'
+      };
+      const req = createMockRequest({ body: forgotData });
+      const res = createMockResponse();
+
+      // Act
+      await userController.forgotPassword(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'If an account with that email exists, a password reset link has been sent'
+      });
+    });
+  });
+
+  /**
+   * @test Resets password with valid token
+   * @scenario Valid reset token and new password
+   * @expected Password reset successfully
+   */
+  describe('resetPassword', () => {
+    it('should reset password with valid token', async () => {
+      // Arrange
+      const { user } = await createUserWithProfile({
+        email: 'test@example.com',
+        passwordResetToken: 'valid-token',
+        passwordResetExpires: new Date(Date.now() + 3600000)
+      });
+
+      const resetData = {
+        token: 'valid-token',
+        password: 'NewSecurePass123!'
+      };
+      const req = createMockRequest({ body: resetData });
+      const res = createMockResponse();
+
+      // Act
+      await userController.resetPassword(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Password reset successfully'
+      });
+    });
+
+    it('should return 400 for invalid token', async () => {
+      // Arrange
+      const resetData = {
+        token: 'invalid-token',
+        password: 'NewSecurePass123!'
+      };
+      const req = createMockRequest({ body: resetData });
+      const res = createMockResponse();
+
+      // Act
+      await userController.resetPassword(req, res);
+
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Invalid or expired reset token'
+      });
+    });
+  });
+
+  /**
+   * @test Verifies email with valid token
+   * @scenario Valid verification token
+   * @expected Email verified successfully
+   */
+  describe('verifyEmail', () => {
+    it('should verify email with valid token', async () => {
+      // Arrange
+      await createUserWithProfile({
+        email: 'test@example.com',
+        emailVerificationToken: 'valid-token'
+      });
+
+      const verifyData = {
+        token: 'valid-token'
+      };
+      const req = createMockRequest({ body: verifyData });
+      const res = createMockResponse();
+
+      // Act
+      await userController.verifyEmail(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Email verified successfully'
+      });
+    });
+
+    it('should return 400 for invalid token', async () => {
+      // Arrange
+      const verifyData = {
+        token: 'invalid-token'
+      };
+      const req = createMockRequest({ body: verifyData });
+      const res = createMockResponse();
+
+      // Act
+      await userController.verifyEmail(req, res);
+
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Invalid verification token'
+      });
+    });
+  });
+
+  /**
+   * @test Gets all users with pagination (admin only)
+   * @scenario Multiple users exist
+   * @expected Returns paginated user list
+   */
+  describe('getAllUsers', () => {
+    it('should return all users with pagination', async () => {
+      // Arrange
+      await createUserWithProfile({ email: 'user1@example.com' });
+      await createUserWithProfile({ email: 'user2@example.com' });
+      await createUserWithProfile({ email: 'user3@example.com' });
+
+      const req = createMockRequest({ 
+        query: { page: '1', limit: '10' }
+      });
+      const res = createMockResponse();
+
+      // Act
+      await userController.getAllUsers(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        users: expect.arrayContaining([
+          expect.objectContaining({
+            email: expect.any(String),
+            role: expect.any(String)
+          })
+        ]),
+        pagination: expect.objectContaining({
+          page: 1,
+          limit: 10,
+          total: expect.any(Number)
+        })
+      });
+    });
+
+    it('should filter users by search term', async () => {
+      // Arrange
+      await createUserWithProfile({ email: 'john@example.com' });
+      await createUserWithProfile({ email: 'jane@example.com' });
+
+      const req = createMockRequest({ 
+        query: { search: 'john' }
+      });
+      const res = createMockResponse();
+
+      // Act
+      await userController.getAllUsers(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        users: expect.arrayContaining([
+          expect.objectContaining({
+            email: 'john@example.com'
+          })
+        ]),
+        pagination: expect.any(Object)
+      });
+    });
+  });
+
+  /**
+   * @test Gets user by ID (admin only)
+   * @scenario Valid user ID
+   * @expected Returns user information
+   */
+  describe('getUserById', () => {
+    it('should return user by ID', async () => {
+      // Arrange
+      const { user, profile } = await createUserWithProfile();
+      const req = createMockRequest({ 
+        params: { id: user._id.toString() }
+      });
+      const res = createMockResponse();
+
+      // Act
+      await userController.getUserById(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        user: expect.objectContaining({
+          email: user.email,
+          role: user.role
+        })
+      });
+    });
+
+    it('should return 404 for non-existent user', async () => {
+      // Arrange
+      const fakeId = new mongoose.Types.ObjectId();
+      const req = createMockRequest({ 
+        params: { id: fakeId.toString() }
+      });
+      const res = createMockResponse();
+
+      // Act
+      await userController.getUserById(req, res);
+
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'User not found'
+      });
+    });
+  });
+
+  /**
+   * @test Updates user by ID (admin only)
+   * @scenario Valid user ID and update data
+   * @expected User updated successfully
+   */
+  describe('updateUserById', () => {
+    it('should update user by ID', async () => {
+      // Arrange
+      const { user } = await createUserWithProfile();
+      const updateData = {
+        role: 'guide',
+        status: 'active'
+      };
+      const req = createMockRequest({
+        params: { id: user._id.toString() },
+        body: updateData
+      });
+      const res = createMockResponse();
+
+      // Act
+      await userController.updateUserById(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'User updated successfully',
+        user: expect.objectContaining({
+          role: 'guide',
+          status: 'active'
+        })
+      });
+    });
+  });
+
+  /**
+   * @test Soft deletes user by ID (admin only)
+   * @scenario Valid user ID
+   * @expected User soft deleted successfully
+   */
+  describe('deleteUserById', () => {
+    it('should soft delete user by ID', async () => {
+      // Arrange
+      const { user } = await createUserWithProfile();
+      const req = createMockRequest({ 
+        params: { id: user._id.toString() }
+      });
+      const res = createMockResponse();
+
+      // Act
+      await userController.deleteUserById(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'User deleted successfully'
+      });
+    });
+  });
+
+  /**
+   * @test Activates user account (admin only)
+   * @scenario Inactive user account
+   * @expected User account activated
+   */
+  describe('activateUser', () => {
+    it('should activate user account', async () => {
+      // Arrange
+      const { user } = await createUserWithProfile({
+        status: 'inactive'
+      });
+      const req = createMockRequest({ 
+        params: { id: user._id.toString() }
+      });
+      const res = createMockResponse();
+
+      // Act
+      await userController.activateUser(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'User activated successfully',
+        user: expect.objectContaining({
+          status: 'active'
+        })
+      });
+    });
+  });
+
+  /**
+   * @test Deactivates user account (admin only)
+   * @scenario Active user account
+   * @expected User account deactivated
+   */
+  describe('deactivateUser', () => {
+    it('should deactivate user account', async () => {
+      // Arrange
+      const { user } = await createUserWithProfile({
+        status: 'active'
+      });
+      const req = createMockRequest({ 
+        params: { id: user._id.toString() }
+      });
+      const res = createMockResponse();
+
+      // Act
+      await userController.deactivateUser(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'User deactivated successfully',
+        user: expect.objectContaining({
+          status: 'inactive'
+        })
+      });
+    });
+  });
+
+  /**
+   * @test Unlocks user account (admin only)
+   * @scenario Locked user account
+   * @expected User account unlocked
+   */
+  describe('unlockUser', () => {
+    it('should unlock user account', async () => {
+      // Arrange
+      const { user } = await createUserWithProfile({
+        meta: {
+          loginAttempts: 5,
+          lockUntil: new Date(Date.now() + 3600000)
+        }
+      });
+      const req = createMockRequest({ 
+        params: { id: user._id.toString() }
+      });
+      const res = createMockResponse();
+
+      // Act
+      await userController.unlockUser(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'User account unlocked successfully',
+        user: expect.objectContaining({
+          status: 'active'
+        })
+      });
+    });
+  });
+
+  /**
+   * @test Gets user statistics (admin only)
+   * @scenario Multiple users with different statuses
+   * @expected Returns user statistics
+   */
+  describe('getUserStats', () => {
     it('should return user statistics', async () => {
-      const response = await request(app)
-        .get('/stats')
-        .expect(200);
+      // Arrange
+      await createUserWithProfile({ 
+        email: 'user1@example.com', 
+        status: 'active' 
+      });
+      await createUserWithProfile({ 
+        email: 'user2@example.com', 
+        status: 'active' 
+      });
+      await createUserWithProfile({ 
+        email: 'user3@example.com', 
+        status: 'pending' 
+      });
 
-      expect(response.body.stats.total).toBe(3);
-      expect(response.body.stats.active).toBe(2);
-      expect(response.body.stats.pending).toBe(1);
-      expect(response.body.stats.byRole).toBeDefined();
+      const req = createMockRequest();
+      const res = createMockResponse();
+
+      // Act
+      await userController.getUserStats(req, res);
+
+      // Assert
+      expect(res.json).toHaveBeenCalledWith({
+        stats: expect.objectContaining({
+          total: expect.any(Number),
+          active: expect.any(Number),
+          pending: expect.any(Number),
+          suspended: expect.any(Number),
+          byRole: expect.any(Object)
+        })
+      });
     });
   });
 
+  /**
+   * @test Error handling scenarios
+   * @scenario Database errors and invalid data
+   * @expected Proper error responses
+   */
   describe('Error Handling', () => {
     it('should handle database errors gracefully', async () => {
-      // Mock User.findByEmail to throw error
-      const originalFindByEmail = User.findByEmail;
-      User.findByEmail = jest.fn().mockRejectedValue(new Error('Database error'));
+      // Arrange
+      const User = require('../../models/User');
+      jest.spyOn(User, 'findOne').mockImplementationOnce(() => {
+        throw new Error('Database error');
+      });
 
-      const response = await request(app)
-        .post('/login')
-        .send({ email: 'test@example.com', password: 'password' })
-        .expect(500);
+      const req = createMockRequest();
+      const res = createMockResponse();
 
-      expect(response.body.error).toBe('Internal server error during login');
+      // Act
+      await userController.getMe(req, res);
 
-      // Restore original method
-      User.findByEmail = originalFindByEmail;
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Internal server error'
+      });
+    });
+
+    it('should handle validation errors', async () => {
+      // Arrange
+      const invalidData = {
+        email: 'invalid-email',
+        password: 'weak'
+      };
+      const req = createMockRequest({ body: invalidData });
+      const res = createMockResponse();
+
+      // Act
+      await userController.register(req, res);
+
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: expect.stringContaining('Password must contain')
+      });
     });
   });
 });

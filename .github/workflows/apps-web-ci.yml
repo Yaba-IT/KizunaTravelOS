@@ -2,52 +2,160 @@ name: WEB CI
 
 on:
   pull_request:
+    branches: [dev, master]
     paths:
-      - 'apps/web/**'
-      - '.github/workflows/test-web.yml'
-      - 'package.json'
+      - "apps/web/**"
+      - ".github/workflows/apps-web-ci.yml"
+      - "compose/**"
+      - "package.json"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# Default to read-only. Elevate per job only.
 permissions:
   contents: read
-  issues: write
+  pull-requests: read
+  issues: read
+
+env:
+  CI: true
 
 jobs:
-  web:
-    name: WEB Tests & Build
+  paths-filter:
+    name: Detect changes
     runs-on: ubuntu-latest
+    outputs:
+      web_changed: ${{ steps.filter.outputs.web }}
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node.js
+        with: { fetch-depth: 0 }
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+
+  web-dev:
+    name: WEB Dev (lint → test → build)
+    needs: paths-filter
+    if: needs.paths-filter.outputs.web_changed == 'true' && github.base_ref == 'dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'yarn'
-      - name: Install dependencies
+          cache: yarn
+          cache-dependency-path: yarn.lock
+
+      - name: Install deps (workspace-aware)
         run: yarn install --frozen-lockfile
-      - name: Run ESLint
+
+      - name: Lint
         run: yarn workspace web lint
-      - name: Filter paths
-        uses: dorny/paths-filter@v3
-        id: changes
-        with:
-          filters: |
-            components:
-              - 'apps/web/src/components/**'
-            full:
-              - 'apps/web/src/**/*'
-      - name: Run component-scope tests
-        if: steps.changes.outputs.components == 'true'
-        run: yarn workspace web test src/components --ci
-      - name: Run full suite
-        if: steps.changes.outputs.full == 'true'
+
+      - name: Test
         run: yarn workspace web test --ci
-      - name: Build Docker image
-        run: docker build -t web:ci apps/web
-      - name: Docker Compose validation
-        run: |
-          docker-compose -f compose/compose.base.yml -f compose/compose.dev.yml run --rm web echo OK
-      - name: Report failure via Issue
-        if: failure()
-        uses: jayqi/failed-build-issue-action@v1
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push) with cache
+        uses: docker/build-push-action@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          context: apps/web
+          load: true
+          tags: web:test
+          cache-from: type=gha,scope=apps-web
+          cache-to: type=gha,mode=max,scope=apps-web
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '✅ WEB Dev: lint, tests, and Docker build passed.'
+            })
+
+  web-master:
+    name: WEB Master (compose smoke + auto-merge)
+    needs: paths-filter
+    if: needs.paths-filter.outputs.web_changed == 'true' && github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write        # needed to merge
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Compose up deps
+        run: |
+          set -euo pipefail
+          docker compose -f compose/compose.base.yml -f compose/compose.dev.yml up -d mongo postgres rabbitmq
+          sleep 25  # replace with healthchecks when available
+
+      - name: Compose smoke test
+        run: |
+          set -euo pipefail
+          docker compose -f compose/compose.base.yml -f compose/compose.dev.yml run --rm web node -v
+          STATUS=$?
+          docker compose -f compose/compose.base.yml -f compose/compose.dev.yml down -v
+          exit $STATUS
+
+      - name: Auto-merge PR (same-repo only)
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              merge_method: 'squash'
+            })
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '✅ WEB Master: compose smoke test passed. Auto-merge attempted.'
+            })
+
+  no-changes:
+    name: No WEB changes
+    needs: paths-filter
+    if: needs.paths-filter.outputs.web_changed != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '⏭️ No WEB changes. Skipping WEB CI.'
+            })

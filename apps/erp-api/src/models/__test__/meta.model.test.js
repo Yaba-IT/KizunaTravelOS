@@ -7,17 +7,18 @@
 */
 
 const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 const metaSchema = require('../Meta.js');
 
 describe('Meta Schema', () => {
   let TestModel;
+  let mongoServer;
 
   beforeAll(async () => {
-    // Connect to test database
-    const testDbUri = process.env.MONGODB_URI_TEST || process.env.MONGODB_URI;
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(testDbUri);
-    }
+    // Use in-memory database for testing
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    await mongoose.connect(mongoUri);
 
     // Create a test model using the meta schema
     const testSchema = new mongoose.Schema({
@@ -28,13 +29,12 @@ describe('Meta Schema', () => {
   });
 
   afterAll(async () => {
-    if (mongoose.connection.readyState === 1) {
-      await mongoose.connection.close();
-    }
+    await mongoose.disconnect();
+    await mongoServer.stop();
   });
 
   beforeEach(async () => {
-    // Clear all collections that might interfere with tests
+    // Clear all collections
     const collections = await mongoose.connection.db.listCollections().toArray();
     for (const collection of collections) {
       await mongoose.connection.db.collection(collection.name).deleteMany({});

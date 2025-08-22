@@ -7,24 +7,24 @@
  */
 
 const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 const Journey = require('../Journey.js');
 const Provider = require('../Provider.js');
 
 describe('Journey Model', () => {
   let testProvider;
+  let mongoServer;
 
   beforeAll(async () => {
-    // Connect to test database
-    const testDbUri = process.env.MONGODB_URI_TEST || process.env.MONGODB_URI;
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(testDbUri);
-    }
+    // Use in-memory database for testing
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    await mongoose.connect(mongoUri);
   });
 
   afterAll(async () => {
-    if (mongoose.connection.readyState === 1) {
-      await mongoose.connection.close();
-    }
+    await mongoose.disconnect();
+    await mongoServer.stop();
   });
 
   beforeEach(async () => {

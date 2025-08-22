@@ -66,7 +66,7 @@ const validationSchemas = {
     phone: {
       required: false,
       type: 'string',
-      pattern: /^[\+]?[1-9][\d]{0,15}$/,
+      pattern: /^[+]?[1-9][\d]{0,15}$/,
       message: 'Phone number must be a valid international phone number'
     },
     dateOfBirth: {
@@ -136,7 +136,7 @@ const validators = {
       try {
         const regex = new RegExp(pattern);
         return regex.test(value);
-      } catch (error) {
+      } catch {
         return false;
       }
     }

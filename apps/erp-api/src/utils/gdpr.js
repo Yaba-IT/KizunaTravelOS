@@ -7,8 +7,8 @@
 */
 
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
+// const fs = require('fs');
+// const path = require('path');
 
 /**
  * GDPR Compliance Utility Module
@@ -52,7 +52,7 @@ class GDPRCompliance {
       }
 
       return ip;
-    } catch (error) {
+    } catch {
       return '0.0.0.0';
     }
   }
@@ -76,7 +76,7 @@ class GDPRCompliance {
         return `${anonymizedLocal}@${domain}`;
       }
       return email;
-    } catch (error) {
+    } catch {
       return '***@***';
     }
   }

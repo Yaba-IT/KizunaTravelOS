@@ -187,10 +187,10 @@ exports.getPublicJourneys = async (req, res) => {
 exports.getJourneyDetails = async (req, res) => {
   try {
     const journey = await Journey.findOne({
-      _id: req.params.id,
+      _id: req.params.journeyId,
       'meta.isDeleted': false,
       status: 'active'
-    }).select('name description price duration category itinerary included excluded images');
+    }).select('name description pricing duration category destinations');
 
     if (!journey) {
       return res.status(404).json({ error: 'Journey not found or inactive' });
